@@ -1,0 +1,2 @@
+from jwst_mast_query import jwstMAST
+from jwstMAST import jwstMASTclass
