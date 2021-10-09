@@ -10,9 +10,9 @@ from astropy.time import Time
 import numpy as np
 import pandas as pd
 #import astropy.io.fits as fits
-from astropy.nddata import bitmask
+#from astropy.nddata import bitmask
 import astroquery
-import argparse,os,sys,re,io
+import argparse,os,sys,re,types
 import yaml
 
 # pdastroclass is wrapper around pandas.
@@ -42,6 +42,8 @@ if astroquery.__version__<'0.4.2':
 # $JWST_QUERY_CFGFILE: the config file is optional. It an be specified with 
 # $JWST_QUERY_CFGFILE or with --configfile
 
+
+
 class query_mast:
     def __init__(self):
         '''
@@ -62,7 +64,9 @@ class query_mast:
                 'Product_search':'Mast.Caom.Products.JwstOps'
                 }
         
-        
+        self.verbose = 0
+        self.debug = 0
+
         # delete all tables and outdir, set the default parameters
         self.reset()
         
@@ -97,7 +101,7 @@ class query_mast:
 
         # output columns for the tables. Note that the columns for the individual filetypes
         # are automatically added to the obsTable
-        #self.outcolumns_productTable = ['proposal_id','obsnum','obsID','parent_obsid','obs_id','dataproduct_type','productFilename','filetype','calib_levels','size','description']
+        #self.outcolumns_productTable = ['proposal_id','obsnum','obsID','parent_obsid','obs_id','dataproduct_type','productFilename','filetype','calib_level','size','description']
         #self.outcolumns_obsTable = ['proposal_id','obsnum','obsid','obs_id','t_min','t_exptime','date_min']
 
         # self.params will be populated with the arguments
@@ -110,11 +114,11 @@ class query_mast:
         # output columns for the tables. Note that the columns for the individual filetypes
         # are automatically added to the obsTable
         # These are the default values, they can be changed in the config file
-        self.params['outcolumns_productTable']=['proposal_id','obsnum','obsID','parent_obsid','obs_id','dataproduct_type','productFilename','filetype','calib_levels','size','description']
+        self.params['outcolumns_productTable']=['proposal_id','obsnum','obsID','parent_obsid','obs_id','dataproduct_type','productFilename','filetype','calib_level','size','description']
         self.params['outcolumns_obsTable']=['proposal_id','obsnum','obsid','obs_id','t_min','t_exptime','date_min']
 
         # The productTable is sorted based on these columns  (can also be set in config file)
-        self.params['sortcols_productTable']=['calib_levels','filetype','obsID']
+        self.params['sortcols_productTable']=['calib_level','filetype','obsID']
         # The obsTable is sorted based on these columns  (can also be set in config file)
         self.params['sortcols_obsTable']=['date_min','proposal_id','obsnum']
         # The summary table is sorted based on these columns (can also be set in config file)
@@ -135,17 +139,28 @@ class query_mast:
         else:
             cfgfilename = None
 
+        # default for token is $MAST_API_TOKEN
+        if 'MAST_API_TOKEN' in os.environ:
+            defaulttoken = os.environ['MAST_API_TOKEN']
+        else:
+            defaulttoken = None
+
+
         parser.add_argument('-i', '--instrument', type=str, default=None, choices=['niriss','nircam','nirspec','miri','fgs'], help='Instrument.  (default=%(default)s)')
 
         parser.add_argument('-v','--verbose', default=0, action='count')
         parser.add_argument('--propID', type=int, default=None, help='Search for data for this proposal ID(=APT #) only.')
         parser.add_argument('--guidestars', action='store_true', default=None, help='Don\'t skip guidestars. By default, they are skipped')
         parser.add_argument('-f','--filetypes',  type=str, nargs="+", default=None, help=('List of product filetypes to get, e.g., _uncal.fits or _uncal.jpg. If only letters, then _ and .fits are added, for example uncal gets expanded to _uncal.fits. Typical image filetypes are uncal, rate, rateints, cal (default=%(default)s)'))
-        parser.add_argument('--calib_levels',  type=int, nargs="+", default=None, help=('Only select products with the specified calibration levels (calib_levels column in productTable) (default=%(default)s)'))
+        parser.add_argument('--calib_levels',  type=int, nargs="+", default=None, help=('Only select products with the specified calibration levels (calib_level column in productTable) (default=%(default)s)'))
 
         parser.add_argument('-c','--configfile', type=str, default=cfgfilename, help='optional config file. default is set to $JWST_QUERY_CFGFILE. Use -vvv to see the full list of all set parameters.')
-        parser.add_argument('--token', type=str, default=None, help='MAST API token. You can also set the token in the environment variable $MAST_API_TOKEN')
+        parser.add_argument('--login', default=None, nargs=2, help='username and password for login')
+        parser.add_argument('--token', type=str, default=defaulttoken, help='MAST API token. You can also set the token in the environment variable \$MAST_API_TOKEN')
 
+        parser.add_argument('--outrootdir', default=None, help='output root directory (default=%(default)s)')
+        parser.add_argument('--propID2outsubdir', action='store_true', default=False, help='Add the APT proposal ID to the output subdir. By default, IDcol is used as field column (default=%(default)s)')
+        parser.add_argument('--skip_check_if_outfile_exists', action='store_true', default=False,help='Don\'t check if output files exists. This makes it faster for large lists')        
 
 
         time_group = parser.add_argument_group("Time constraints for the observation/product search")
@@ -184,13 +199,37 @@ class query_mast:
 
         '''
 
+        def subenvvarplaceholder(paramsdict):
+            """ Loop through all string parameters and substitute environment variables. environment variables have the form $XYZ """
+            envvarpattern=re.compile('\$(\w+)')
+        
+            for param in paramsdict:
+                if isinstance(paramsdict[param], str):
+                    envvarnames=envvarpattern.findall(paramsdict[param])
+                    if envvarnames:
+                        for name in envvarnames:
+                            if not (name in os.environ): 
+                                raise RuntimeError("environment variable %s used in config file, but not set!" % name)
+                            envval=os.environ[name]
+                            subpattern='\$%s' % (name)
+                            paramsdict[param] = re.sub(subpattern,envval,paramsdict[param])
+                elif isinstance(paramsdict[param], dict):
+                #elif type(dict[param]) is types.DictType:
+                    # recursive: sub environment variables down the dictiionary 
+                    subenvvarplaceholder(paramsdict[param])
+            return(0)
+
+
         # get the parameters from the config file
         if args.configfile is not None:
             #cfgparams = yaml.load_file(args.configfile)
             if not os.path.isfile(args.configfile):
                 raise RuntimeError('config file %s does not exist!' % (args.configfile))
+            print(f'Loading config file {args.configfile}')
             cfgparams = yaml.load(open(args.configfile,'r'), Loader=yaml.FullLoader) 
             self.params.update(cfgparams)
+            subenvvarplaceholder(self.params)
+
             if args.verbose>2:
                 print('\n### CONFIG FILE PARAMETERS:')
                 for p in cfgparams:
@@ -227,6 +266,20 @@ class query_mast:
         print('INSTRUMENT:',self.params['instrument'])
         #sys.exit(0)
 
+        return(0)
+    
+    def login(self,token=None,raiseErrorFlag=False):
+        if token is None:
+            token = self.params['token']
+            
+        if token is None:
+            if raiseErrorFlag:
+                raise RuntimeError("No token!! Cannot login! you can set the token with \$API_MAST_TOKEN, as 'token' in the config file, or with --token ")
+            else:
+                print("Warning: no token given, could not login, only public requests possible")
+                return(1)
+        else:
+            self.JwstObs.login(token=token, store_token=True)
         return(0)
 
     def set_outdir(self, outrootdir=None, outsubdir=None):
@@ -283,7 +336,7 @@ class query_mast:
 
         return(mjd_min, mjd_max)
             
-    def observation_query(self, propID=None, instrument=None, mjd_min=None, mjd_max=None):
+    def observation_query(self, propID=None, instrument=None, mjd_min=None, mjd_max=None, token=None):
         '''
         Perform query for observations matching JWST instrument and program ID
         that began after a particular date.
@@ -311,8 +364,8 @@ class query_mast:
         
         if self.verbose: 
             print('\n#### Querying Obstable....')
-        if self.params['token'] is not None:
-            self.obsTable.t = self.JwstObs.service_request(service, params,mast_token=self.params['token']).to_pandas()
+        if token is not None:
+            self.obsTable.t = self.JwstObs.service_request(service, params,mast_token=token).to_pandas()
         else:
             self.obsTable.t = self.JwstObs.service_request(service, params).to_pandas()
         if self.verbose: 
@@ -354,7 +407,6 @@ class query_mast:
             Table with observations. The default is None. If None, then self.obsTable is used
         productTable : pdastroclass, optional
             Table with products. The default is None. If None, then self.productTable is used
-
         Returns
         -------
         None.
@@ -385,17 +437,30 @@ class query_mast:
                 if len(ixs)>0:
                     obsnum = unique(productTable.t.loc[ixs,'obsnum'])
                     if len(obsnum)==0:
-                        obsTable.write(indices=ix_obsTable)
+                        obsTable.write(indices=ixs_obsTable)
                         productTable.write(indices=ixs_prodTable)
                         raise RuntimeError('No obsnum for these observations and products!')
+                    """
                     if len(obsnum)>1:
+                        print('\n BUUUGGGGG!!!!')
+                        obsTable.write(indices=[ix_obsTable])
+                        productTable.write(indices=ixs)
                         print('More than one obsnum!',obsnum)
                         raise RuntimeError('BUGGG!!!!!')
-                    obsTable.t.loc[ix_obsTable,'obsnum'] = obsnum
+                    """
+                    if len(obsnum)==1:
+                        obsTable.t.loc[ix_obsTable,'obsnum'] = obsnum
+                    else:
+                        if self.debug:
+                            obsTable.write(indices=[ix_obsTable])
+                            productTable.write(indices=ixs)
+                            print('More than one obsnum!',obsnum)
+                            raise RuntimeError('BUGGG!!!!!')
+                    
                 else:
                     print('Warning: could not determine obsnum for observation %s' % (obsTable.t.loc[ix_obsTable,'obsid']))
                 
-            # If there are entries in productTable for which 'obsnum' is None (happens to some calib_levels=3 products) fill them up
+            # If there are entries in productTable for which 'obsnum' is None (happens to some calib_level=3 products) fill them up
             ixs_null = productTable.ix_is_null('obsnum',indices=ixs_prodTable)
             if len(ixs_null)>0:
                 productTable.t.loc[ixs_null,'obsnum'] = obsTable.t.loc[ix_obsTable,'obsnum'] 
@@ -461,8 +526,8 @@ class query_mast:
 
         if self.verbose: print('productTable columns:',self.productTable.t.columns)
         if self.verbose: 
-            allfiltypes = unique(self.productTable.t['filetype'])
-            print('List of all filetypes of obtained products:',allfiltypes)
+            allfiletypes = unique(self.productTable.t['filetype'])
+            print('List of all filetypes of obtained products:',allfiletypes)
         
         return self.productTable
     
@@ -490,7 +555,6 @@ class query_mast:
                 filetypes[i] += '.fits'
         
         print('allowed filetype list:',filetypes)
-
 
         ix_products = self.productTable.getindices()
         # remove guide stars if wanted...
@@ -537,6 +601,68 @@ class query_mast:
 
         return(self.ix_selected_products)
     
+    def mk_outfilename(self, productTable, ix, outrootdir, 
+                       propID2outsubdir=False, 
+                       obsnum2outsubdir=False, 
+                       #info2filename=False,
+                       skip_check_if_outfile_exists=False):
+
+
+        outdir = outrootdir.rstrip("/")
+
+
+        if propID2outsubdir:
+            outdir += f'/{productTable.t.loc[ix,"proposal_id"]}'
+        
+        if obsnum2outsubdir:
+            if productTable.t.loc[ix,"obsnum"] is pd.NA:
+                outdir += '/NA'
+            else:
+                outdir += f'/{productTable.t.loc[ix,"obsnum"]}'
+            
+
+        outfilename = productTable.t.loc[ix,'productFilename']
+        
+        fullfilename = os.path.abspath(f'{outdir}/{outfilename}')
+        productTable.t.loc[ix,'outfilename']=fullfilename
+    
+        if not skip_check_if_outfile_exists:
+            if os.path.exists(fullfilename):
+                productTable.t.loc[ix,'dl_code'] = 2
+                productTable.t.loc[ix,'dl_str'] = 'exists'
+            else:
+                productTable.t.loc[ix,'dl_code'] = 0
+                productTable.t.loc[ix,'dl_str'] = None
+  
+    
+    def mk_outfilenames(self,
+                        outrootdir,
+                        productTable=None, 
+                        ix_selected_products=None,
+                        propID2outsubdir=False, 
+#                        info2filename=False,
+                        skip_check_if_outfile_exists=False):
+        
+        if productTable==None:
+           productTable=self.productTable
+           
+        if ix_selected_products is None:
+            ix_selected_products = self.ix_selected_products
+        
+        productTable.t.loc[ix_selected_products,'outfilename'] = None
+        productTable.t.loc[ix_selected_products,'dl_code'] = np.nan
+        productTable.t.loc[ix_selected_products,'dl_str'] = None
+        productTable.t['dl_code'] = productTable.t['dl_code'].astype(pd.Int32Dtype())
+#        if 'outfilename' not in self.imoutcols: self.imoutcols.append('outfilename')
+#        if 'dl_code' not in self.imoutcols: self.imoutcols.append('dl_code')
+#        if 'dl_str' not in self.imoutcols: self.imoutcols.append('dl_str')
+        for ix in ix_selected_products:
+            self.mk_outfilename(productTable,
+                                ix, outrootdir, 
+                                propID2outsubdir=propID2outsubdir, 
+                                #info2filename=info2filename, 
+                                skip_check_if_outfile_exists=skip_check_if_outfile_exists)
+        return(0)
 
 
     def update_obsTable_with_selectedProducts(self, obsTable=None, productTable=None, ix_selected_products=None, filetypes=None):
@@ -622,6 +748,8 @@ class query_mast:
                         productTable.write(indices=ixs_prodTable)
                         raise RuntimeError('No obsnum for these observations and products!')
                     if len(obsnum)>1:
+                        obsTable.write(indices=ix_obsTable)
+                        productTable.write(indices=ixs)
                         print('More than one obsnum!',obsnum)
                         raise RuntimeError('BUGGG!!!!!')
                     obsTable.t.loc[ix_obsTable,'obsnum'] = obsnum
@@ -655,17 +783,19 @@ class query_mast:
         for propID in propIDs:
             ixs_propID =  obsTable.ix_equal('proposal_id',propID)
 
-            obsnums = unique(obsTable.t.loc[ixs_propID,'obsnum'])
+            ixs_propID_notnull = obsTable.ix_remove_null('obsnum', indices=ixs_propID)
+            obsnums = unique(obsTable.t.loc[ixs_propID_notnull,'obsnum'])
+            if len(ixs_propID)!=len(ixs_propID_notnull):
+                obsnums.append(pd.NA)
             if self.verbose>2: 
                 print('\n#### propID:',propID,' obsnums:',obsnums)
             # Loop through echo obsnum for the given propID, and make a summary entry
             for obsnum in obsnums:
                 newline_obsnum={'proposal_id':propID}
-
                 if obsnum is pd.NA:
                     ixs_obsnum = obsTable.ix_is_null('obsnum',indices=ixs_propID)
                 else:
-                    ixs_obsnum = obsTable.ix_equal('obsnum',obsnum,indices=ixs_propID)
+                    ixs_obsnum = obsTable.ix_equal('obsnum',obsnum,indices=ixs_propID_notnull)
                 if self.verbose>2: 
                     obsTable.write(indices=ixs_obsnum)
                 newline_obsnum['obsnum']=obsnum
@@ -729,6 +859,11 @@ class query_mast:
         # uses self.filetypes for filtering, which is set by optional parameters.
         self.product_filter()
         
+        # definte the output filenames, and check if they exist.
+        self.mk_outfilenames(self.params['outrootdir'],
+                             propID2outsubdir=self.params['propID2outsubdir'],
+                             skip_check_if_outfile_exists=self.params['skip_check_if_outfile_exists'])
+        
         # update obsTable with selected products: count the different filetypes, and also update the obsnum if None in obsTable
         self.update_obsTable_with_selectedProducts()
 
@@ -764,6 +899,8 @@ if __name__ == '__main__':
     query.get_arguments(args)
     if query.verbose>2:
         print('params:', query.params)
+
+    query.login(raiseErrorFlag=False)
         
     # make the tables  
     query.mk_all_tables()

@@ -39,7 +39,14 @@ def AorB(A,B):
         return(A)
     return(np.union1d(A,B))
 
-def AandB(A,B,assume_unique=False):
+def AandB(A,B,assume_unique=False,keeporder=False):
+    if keeporder:
+        # This is slower, but keeps order
+        out=[]
+        for i in A: 
+            if i in B:
+                out.append(i)
+        return(out)
     return(np.intersect1d(A,B,assume_unique=assume_unique))
 
 def AnotB(A,B,keeporder=False):
@@ -504,19 +511,29 @@ class pdastroclass:
         self.t.loc[index,list(dicti.keys())]=list(dicti.values())
         return(index)
 
-    def fitsheader2table(self,fitsfilecolname,indices=None,requiredfitskeys=None,optionalfitskey=None,raiseError=True,skipcolname=None,headercol=None,ext=None,extname=None):
+    def fitsheader2table(self,fitsfilecolname,indices=None,requiredfitskeys=None,optionalfitskey=None,
+                         raiseError=True,skipcolname=None,headercol=None,ext=None,extname=None,
+                         prefix=None,suffix=None):
+        def fitskey2col(fitskey,prefix=None,suffix=None):
+            col = fitskey
+            if prefix is not None: col = prefix+col
+            if suffix is not None: col += suffix
+            return(col)            
+
 
         indices = self.getindices(indices)        
 
         # initialize columns if necessary
         if requiredfitskeys!=None:
             for fitskey in requiredfitskeys:
-                if not (fitskey in self.t.columns):
-                    self.t[fitskey]=None
+                col = fitskey2col(fitskey,prefix=prefix,suffix=suffix)
+                if not (col in self.t.columns):
+                    self.t[col]=None
         if optionalfitskey!=None:
             for fitskey in optionalfitskey:
-                if not (fitskey in self.t.columns):
-                    self.t[fitskey]=None
+                col = fitskey2col(fitskey,prefix=prefix,suffix=suffix)
+                if not (col in self.t.columns):
+                    self.t[col]=None
 
         if headercol!=None and (not (headercol in self.t.columns)):
             self.t[headercol]=None
@@ -531,22 +548,24 @@ class pdastroclass:
                 self.t.loc[index,skipcolname]=False
             if requiredfitskeys!=None:
                 for fitskey in requiredfitskeys:
+                    col = fitskey2col(fitskey,prefix=prefix,suffix=suffix)
                     if fitskey in header:
-                        self.t.loc[index,fitskey]=header[fitskey]
+                        self.t.loc[index,col]=header[fitskey]
                     else:
                         if raiseError:
                             raise RuntimeError("fits key %s does not exist in file %s" % (fitskey,self.t[fitsfilecolname][index]))
                         else:
-                            self.t.loc[index,fitskey]=None
+                            self.t.loc[index,col]=None
                             if skipcolname!=None:
                                  self.t.loc[index,skipcolname]=True
                                  
             if optionalfitskey!=None:
                 for fitskey in optionalfitskey:
+                    col = fitskey2col(fitskey,prefix=prefix,suffix=suffix)
                     if fitskey in header:
-                        self.t.loc[index,fitskey]=header[fitskey]
+                        self.t.loc[index,col]=header[fitskey]
                     else:
-                        self.t.loc[index,fitskey]=None
+                        self.t.loc[index,col]=None
 
     def dateobs2mjd(self,dateobscol,mjdcol,timeobscol=None,indices=None,tformat='isot'):
         indices = self.getindices(indices)  
