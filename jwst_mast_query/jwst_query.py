@@ -42,6 +42,22 @@ if astroquery.__version__<'0.4.2':
 # $JWST_QUERY_CFGFILE: the config file is optional. It an be specified with 
 # $JWST_QUERY_CFGFILE or with --configfile
 
+def getlimits(lims):
+    if lims is None or len(lims)==0:
+        return(None)
+    if len(lims)==1:
+        if re.search('\+$',lims[0]):
+            lims[0]=re.sub('\+$','',lims[0])
+            return([lims[0],None])
+        elif  re.search('\-$',lims[0]):
+            lims[0]=re.sub('\-$','',lims[0])
+            return([None,lims[0]])
+        else:
+            return([lims[0],lims[0]])    
+    elif len(lims)==2:
+        return([lims[0],lims[1]])    
+    else:
+        raise RuntimeError(f'limits can have only 2 entries, more given! {lims}')
 
 
 class query_mast:
@@ -159,17 +175,21 @@ class query_mast:
         parser.add_argument('--token', type=str, default=defaulttoken, help='MAST API token. You can also set the token in the environment variable \$MAST_API_TOKEN')
 
         parser.add_argument('--outrootdir', default=None, help='output root directory (default=%(default)s)')
-        parser.add_argument('--propID2outsubdir', action='store_true', default=False, help='Add the APT proposal ID to the output subdir. By default, IDcol is used as field column (default=%(default)s)')
-        parser.add_argument('--skip_check_if_outfile_exists', action='store_true', default=False,help='Don\'t check if output files exists. This makes it faster for large lists')        
+        parser.add_argument('--outsubdir', default=None, help='osubdir added to utput root directory (default=%(default)s)')
+        parser.add_argument('--skip_propID2outsubdir', action='store_true', default=None, help='By default, the APT proposal ID is added as a subdir to the output directory. You can skip this with this option (default=%(default)s)')
+        parser.add_argument('--skip_check_if_outfile_exists', action='store_true', default=None,help='Don\'t check if output files exists. This makes it faster for large lists')        
 
+        parser.add_argument('-e','--obsid_select', nargs="+", default=[], help='Specify obsid range applied to "obsID" column in the PRODUCT table. If single value, then exact match. If single value has "+" or "-" at the end, then it is a lower and upper limit, respectively. If two values, then range. Examples: 385539+, 385539-, 385539 385600 (default=%(default)s)')
+        parser.add_argument('-l','--obsid_list', nargs="+", default=[], help='Specify list of obsid applied to "obsID" column in the PRODUCT table. examples: 385539 385600 385530 (default=%(default)s)')
 
         time_group = parser.add_argument_group("Time constraints for the observation/product search")
 
         time_group.add_argument('-l', '--lookbacktime', type=float, default=None, help='lookback time in days.')
-        time_group.add_argument('--mjd_min', type=float, default=None, help='minimum MJD. overrides lookback time.')
-        time_group.add_argument('--mjd_max', type=float, default=None, help='maximum MJD. overrides lookback time.')
-        time_group.add_argument('-m', '--mjd_limits', default=None, type=float, nargs=2, help='specify the MJD limits. overrides lookback time and mjd_min/max optional arguments.')
-        time_group.add_argument('-d', '--date_limits', default=None, type=str, nargs=2, help='specify the date limits (ISOT format). overrides lookback time and mjd* optional arguments.')
+#        time_group.add_argument('--mjd_min', type=float, default=None, help='minimum MJD. overrides lookback time.')
+#        time_group.add_argument('--mjd_max', type=float, default=None, help='maximum MJD. overrides lookback time.')
+#        time_group.add_argument('-m', '--mjd_limits', default=None, type=float, nargs=2, help='specify the MJD limits. overrides lookback time and mjd_min/max optional arguments.')
+#        time_group.add_argument('-d', '--date_limits', default=None, type=str, nargs=2, help='specify the date limits (ISOT format). overrides lookback time and mjd* optional arguments.')
+        time_group.add_argument('-d','--date_select', nargs="+", default=[], help='Specify date range (MJD or isot format) applied to "dateobs_center" column. If single value, then exact match. If single value has "+" or "-" at the end, then it is a lower and upper limit, respectively. Examples: 58400+, 58400-,2020-11-23+, 2020-11-23 2020-11-25  (default=%(default)s)')
         
         time_group.add_argument('--lre3', action='store_true', default=None, help='Use the LRE-3 date limits. Overrides lookback and mjd* options.')
         time_group.add_argument('--lre4', action='store_true', default=None, help='Use the LRE-4 date limits. Overrides lookback and mjd* options.')
@@ -282,34 +302,74 @@ class query_mast:
             self.JwstObs.login(token=token, store_token=True)
         return(0)
 
-    def set_outdir(self, outrootdir=None, outsubdir=None):
-        if outrootdir is None: outrootdir = self.params['outrootdir']
-        if outsubdir is None: outsubdir = self.params['outsubdir']
-        if outsubdir is None: outsubdir = self.params['propID']
+    def obsid_select(self,obsid_select,                        
+                     productTable=None, 
+                     ix_selected_products=None):
+
+        if productTable==None:
+           productTable=self.productTable
+           
+        if ix_selected_products is None:
+            ix_selected_products = self.ix_selected_products
         
-        self.outdir = '%s/%s' % (outrootdir,outsubdir)
+        # parse trailing '+' and '-', and get limits
+        limits = getlimits(obsid_select)
+        if limits is None: 
+            return(ix_selected_products)
+        
+        for i in range(len(limits)):
+            if limits[i] is not None: limits[i]=int(limits[i])
 
+        ixs = self.productTable.ix_remove_null('obsID',indices=ix_selected_products)
+        ixs_keep = self.productTable.ix_inrange('obsID',limits[0],limits[1],indices=ixs)
+        print(f'obsid cut {limits[0]} - {limits[1]}: keeping {len(ixs_keep)} from {len(ixs)}')
+        return(ixs_keep)
 
-    def get_mjd_limits(self, lookbacktime=None, mjd_min=None, mjd_max=None, mjd_limits=None, date_limits=False, lre3=False, lre4=False, lre5=False, lre6=False):
+    def obsid_list(self,obsid_list,
+                     productTable=None, 
+                     ix_selected_products=None):
+
+        if productTable==None:
+           productTable=self.productTable
+           
+        if ix_selected_products is None:
+            ix_selected_products = self.ix_selected_products
+        
+        if obsid_list is None or len(obsid_list)==0:
+            return(ix_selected_products)
+
+        ixs_keep = []
+        for obsid in obsid_list:
+            obsid = int(obsid)
+            ixs2add = self.productTable.ix_equal('obsID',obsid,indices=ix_selected_products)
+            ixs_keep.extend(ixs2add)
+        print(f'obsid list cut: keeping {len(ixs_keep)} from {len(ix_selected_products)}')
+        return(ixs_keep)
+
+            
+    def get_mjd_limits(self, lookbacktime=None, date_select=None, lre3=False, lre4=False, lre5=False, lre6=False):
         if lookbacktime is None: lookbacktime = self.params['lookbacktime']
-        if mjd_min is None:     mjd_min = self.params['mjd_min']
-        if mjd_max is None:     mjd_max = self.params['mjd_max']
-        if mjd_limits is None:  mjd_limits = self.params['mjd_limits']
-        if date_limits is None: date_limits = self.params['date_limits']
+        
+        if date_select is None: date_select = self.params['date_select']
         if not lre3: lre3 = self.params['lre3']
         if not lre4: lre4 = self.params['lre4']
         if not lre5: lre5 = self.params['lre5']
         if not lre6: lre6 = self.params['lre6']
         
-        if self.params['mjd_limits'] is not None:
-            mjd_min =  self.params['mjd_limits'][0]
-            mjd_max =  self.params['mjd_limits'][1]
-            
-        if self.params['date_limits'] is not None:
-            mjd_min =  Time(self.params['date_limits'][0], format='isot').mjd
-            mjd_max =  Time(self.params['date_limits'][1], format='isot').mjd
-
-        if lre3:
+        mjd_min = mjd_max = None
+        # parse trailing '+' and '-', and get limits
+        limits = getlimits(date_select)
+        if limits is not None:
+            # Convert dates into MJD if necessary
+            for i in (0,1):            
+                if limits[i] is not None:
+                    try:
+                        limits[i] = float(limits[i])
+                    except:
+                        limits[i]= Time(limits[i], format='isot').to_value('mjd')
+            mjd_min = limits[0]
+            mjd_max = limits[1]
+        elif lre3:
             if self.verbose: print('setting mjd limits to LRE-3!')
             mjd_min = Time('2021-05-19', format='iso').mjd
             mjd_max = mjd_min+7
@@ -335,7 +395,6 @@ class query_mast:
             mjd_max = Time.now().mjd+0.1
 
         return(mjd_min, mjd_max)
-            
     def observation_query(self, propID=None, instrument=None, mjd_min=None, mjd_max=None, token=None):
         '''
         Perform query for observations matching JWST instrument and program ID
@@ -391,7 +450,10 @@ class query_mast:
         self.ix_obs_sorted = self.obsTable.ix_sort_by_cols(self.params['sortcols_obsTable'])
 
         # make proposal_id integer
-        self.obsTable.t['proposal_id']=self.obsTable.t['proposal_id'].astype('int')
+        if 'proposal_id' in self.obsTable.t.columns:
+            self.obsTable.t['proposal_id']=self.obsTable.t['proposal_id'].astype('int')
+        if 'obsid' in self.obsTable.t.columns:
+            self.obsTable.t['obsid']=self.obsTable.t['obsid'].astype('int')
 
         if self.verbose>1: print('Obstable columns:',self.obsTable.t.columns)
 
@@ -481,7 +543,7 @@ class query_mast:
             
         
         # query MAST for all products for the obsid's
-        obsids = ','.join(obsTable.t['obsid'])
+        obsids = ','.join(obsTable.t['obsid'].astype('str'))
         service = self.SERVICES['Product_search']
         params = {"obsid":obsids,
                   "columns":['type','productType'],
@@ -521,6 +583,11 @@ class query_mast:
 
         # make proposal_id integer
         self.productTable.t['proposal_id']=self.productTable.t['proposal_id'].astype('int')
+        # make obsid integer
+        if 'obsID' in self.productTable.t.columns:
+            self.productTable.t['obsID']=self.productTable.t['obsID'].astype('int')
+        if 'parent_obsid' in self.productTable.t.columns:
+            self.productTable.t['parent_obsid']=self.productTable.t['parent_obsid'].astype('int')
 
         self.fix_obsnum(obsTable=obsTable, productTable=self.productTable)
 
@@ -601,17 +668,22 @@ class query_mast:
 
         return(self.ix_selected_products)
     
-    def mk_outfilename(self, productTable, ix, outrootdir, 
-                       propID2outsubdir=False, 
+    def mk_outfilename(self, productTable, ix, 
+                       outdir=None,
+                       skip_propID2outsubdir=False, 
                        obsnum2outsubdir=False, 
                        #info2filename=False,
                        skip_check_if_outfile_exists=False):
 
 
-        outdir = outrootdir.rstrip("/")
+        if outdir is None:
+            outdir = self.outdir
+        if outdir is None:
+            raise RuntimeError("outdir is not defined!")
+        outdir.rstrip("/")
 
 
-        if propID2outsubdir:
+        if not skip_propID2outsubdir:
             outdir += f'/{productTable.t.loc[ix,"proposal_id"]}'
         
         if obsnum2outsubdir:
@@ -635,11 +707,28 @@ class query_mast:
                 productTable.t.loc[ix,'dl_str'] = None
   
     
+    def set_outdir(self,outrootdir=None,outsubdir=None):
+        self.outdir = outrootdir
+        if self.outdir is None:
+            self.outdir = self.params['outrootdir']
+        # if outdir is not defined, use '.'
+        if self.outdir is None or self.outdir == '':
+            self.outdir = '.'
+            
+        
+        if outsubdir is not None and outsubdir!='':
+            self.outdir  += f'/{outsubdir}'
+        elif self.params['outsubdir'] is not None and self.params['outsubdir']!='':
+            self.outdir  += f'/{self.params["outsubdir"]}'
+       
+        self.outdir = os.path.abspath(self.outdir) 
+        return(self.outdir)
+    
     def mk_outfilenames(self,
-                        outrootdir,
                         productTable=None, 
                         ix_selected_products=None,
-                        propID2outsubdir=False, 
+                        outdir=None,
+                        skip_propID2outsubdir=False, 
 #                        info2filename=False,
                         skip_check_if_outfile_exists=False):
         
@@ -648,6 +737,8 @@ class query_mast:
            
         if ix_selected_products is None:
             ix_selected_products = self.ix_selected_products
+            
+            
         
         productTable.t.loc[ix_selected_products,'outfilename'] = None
         productTable.t.loc[ix_selected_products,'dl_code'] = np.nan
@@ -658,11 +749,11 @@ class query_mast:
 #        if 'dl_str' not in self.imoutcols: self.imoutcols.append('dl_str')
         for ix in ix_selected_products:
             self.mk_outfilename(productTable,
-                                ix, outrootdir, 
-                                propID2outsubdir=propID2outsubdir, 
-                                #info2filename=info2filename, 
+                                ix, 
+                                outdir=outdir,
+                                skip_propID2outsubdir=skip_propID2outsubdir, 
                                 skip_check_if_outfile_exists=skip_check_if_outfile_exists)
-        return(0)
+        return(self.ix_selected_products)
 
 
     def update_obsTable_with_selectedProducts(self, obsTable=None, productTable=None, ix_selected_products=None, filetypes=None):
@@ -718,48 +809,6 @@ class query_mast:
                     obsTable.t.loc[ix_obsTable,productTable.t.loc[ix_prodTable,'filetype']] = 0
                 obsTable.t.loc[ix_obsTable,productTable.t.loc[ix_prodTable,'filetype']] += 1
 
-        return(0)
-
-        ixs_obsTable = obsTable.getindices()
-        for ix_obsTable in ixs_obsTable:
-            # find all products for a given observation
-            obsid = obsTable.t.loc[ix_obsTable,'obsid']
-            if self.verbose>2: 
-                print('### obsid',obsid)
-            ixs_prodTable = productTable.ix_equal('parent_obsid',obsid,indices=ix_selected_products)
-            if self.verbose>2: 
-                productTable.write(indices=ixs_prodTable)
-            print('NNNNN',ixs_prodTable,ix_obsTable)
-                
-            # count the product filetypes for each observations
-            for ix_prodTable in ixs_prodTable:
-                if obsTable.t.loc[ix_obsTable,productTable.t.loc[ix_prodTable,'filetype']] is None:
-                    obsTable.t.loc[ix_obsTable,productTable.t.loc[ix_prodTable,'filetype']] = 0
-                obsTable.t.loc[ix_obsTable,productTable.t.loc[ix_prodTable,'filetype']] += 1
-                
-            # If the obsnum cannot be determined from the obsTable 'obs_id', then get it from the products!
-            if obsTable.t.loc[ix_obsTable,'obsnum'] is pd.NA:
-                # remove None entries
-                ixs = productTable.ix_remove_null('obsnum',indices=ixs_prodTable)
-                if len(ixs)>0:
-                    obsnum = unique(productTable.t.loc[ixs,'obsnum'])
-                    if len(obsnum)==0:
-                        obsTable.write(indices=ix_obsTable)
-                        productTable.write(indices=ixs_prodTable)
-                        raise RuntimeError('No obsnum for these observations and products!')
-                    if len(obsnum)>1:
-                        obsTable.write(indices=ix_obsTable)
-                        productTable.write(indices=ixs)
-                        print('More than one obsnum!',obsnum)
-                        raise RuntimeError('BUGGG!!!!!')
-                    obsTable.t.loc[ix_obsTable,'obsnum'] = obsnum
-                else:
-                    print('Warning: could not determine obsnum for observation %s' % (obsTable.t.loc[ix_obsTable,'obsid']))
-                
-            # If there are entries in productTable for which 'obsnum' is None (happens to some calib_levels=3 products) fill them up
-            ixs_null = productTable.ix_is_null('obsnum',indices=ixs_prodTable)
-            if len(ixs_null)>0:
-                productTable.t.loc[ixs_null,'obsnum'] = obsTable.t.loc[ix_obsTable,'obsnum'] 
         return(0)
             
     def mk_summary_tables(self, obsTable=None, filetypes=None):
@@ -832,7 +881,7 @@ class query_mast:
         if filetypes is not None:
             self.params['filetypes'] = filetypes
 
-        # get the MJD limits, based on --mjdlimits --lockbacktime --mjdmin --mjdmax --lre3 --lre4
+        # get the MJD limits, based on --mjdlimits --lockbacktime --mjdmin --mjdmax --lre3 --lre4 --lre5 --lre6
         mjd_min, mjd_max = self.get_mjd_limits()
 
         # get the observations: stored in self.obsTable
@@ -857,11 +906,16 @@ class query_mast:
         # select the products to download
         # If not otherwise specified, uses self.productTable as starting point
         # uses self.filetypes for filtering, which is set by optional parameters.
+        # the selected products indices are put into self.ix_selected_products
         self.product_filter()
         
+        # make some obsid cuts!
+        self.ix_selected_products = self.obsid_select(self.params['obsid_select'])
+        self.ix_selected_products = self.obsid_list(self.params['obsid_list'])
+
+        
         # definte the output filenames, and check if they exist.
-        self.mk_outfilenames(self.params['outrootdir'],
-                             propID2outsubdir=self.params['propID2outsubdir'],
+        self.mk_outfilenames(skip_propID2outsubdir=self.params['skip_propID2outsubdir'],
                              skip_check_if_outfile_exists=self.params['skip_check_if_outfile_exists'])
         
         # update obsTable with selected products: count the different filetypes, and also update the obsnum if None in obsTable

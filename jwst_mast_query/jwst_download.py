@@ -55,54 +55,18 @@ class download_mast(query_mast):
         parser = query_mast.define_options(self,**args)
 
         # options for output directory file
-        if 'JWSTDOWNLOAD_OUTDIR' in os.environ and os.environ['JWSTDOWNLOAD_OUTDIR'] != '':
-            outrootdir = os.environ['JWSTDOWNLOAD_OUTDIR']
-        else:
-            outrootdir = '.'
+        #if 'JWSTDOWNLOAD_OUTDIR' in os.environ and os.environ['JWSTDOWNLOAD_OUTDIR'] != '':
+        #    outrootdir = os.environ['JWSTDOWNLOAD_OUTDIR']
+        #else:
+        #    outrootdir = '.'
         #print('Default output rootdir: %s' % outrootdir)
     
         parser.add_argument('-n','--skipdownload', action='store_true', default=False, help='skip downloading the data.  (default=%(default)s)')
-        parser.add_argument('-o','--outrootdir', default=outrootdir, help=('output root directory. (default=%(default)s)'))
-        parser.add_argument('--outsubdir', default=None, help=('subdir added to the output root directory. If None, then propID is used (default=%(default)s)'))
+#        parser.add_argument('-o','--outrootdir', default=outrootdir, help=('output root directory. (default=%(default)s)'))
+#        parser.add_argument('--outsubdir', default=None, help=('subdir added to the output root directory. If None, then propID is used (default=%(default)s)'))
         parser.add_argument('--clobber', action='store_true', default=None, help='existing files are overwritten, otherwise they are skipped (default=%(default)s)')
 
         return(parser)
-
-    def fetch_products(self, productTable=None, ix_selected_products=None):
-        '''
-        Retrieve specified data products from the MAST web service
-        '''
-        if productTable==None:
-           productTable=self.productTable
-        
-        if ix_selected_products is None:
-            ix_selected_products = self.ix_selected_products
-        
-        uri_list_str = '&'.join(["uri=" + x for x in productTable.t.loc[ix_selected_products,'dataURI']])
-        print('uri_list_str:',uri_list_str)      
-
-#        uri_list_str = '&'.join(["uri=" + x for x in product_table["dataURI"]])
-        now_str = ''.join(str(x).zfill(2) for x in Time.now().ymdhms).split('.')[0]
-        
-        shortname = 'mastDownload_' + now_str + '.sh'
-        shellscript_filename = self.outdir+'/'+shortname
-        makepath4file(shellscript_filename)
-        
-        print('Saving shell script:',shellscript_filename)        
-        download_url = self.JwstObs._portal_api_connection.MAST_BUNDLE_URL + ".sh?" + uri_list_str
-        print('download_url',download_url)
-        result = self.JwstObs._download_file(download_url, shellscript_filename)
-        print('######## RRRRRRRR Result:',result)
-        
-        shellscriptlines = open(shellscript_filename,'r').readlines()
-        bundlename = None
-        for line in shellscriptlines:
-            m = re.search('^FOLDER\=(\S+)',line)
-            if m is not None:
-                bundlename = m.groups()[0]+'.sh'
-                break
-        
-        return(bundlename)
 
     def download_product(self, url, outfilename, clobber=False):
         """
@@ -162,94 +126,18 @@ class download_mast(query_mast):
         return(1,'downloaded')
 
 
-    def download_productsold(self, productTable=None, ix_selected_products=None, token=None, ask_confirm_download=True):
+
+    def download_products(self, productTable=None, ix_selected_products=None, clobber=None, ask_confirm_download=True):
 
         if productTable==None:
            productTable=self.productTable
 
         if ix_selected_products is None:
             ix_selected_products = self.ix_selected_products
+                    
+        if clobber is None:
+            clobber=self.params['clobber']
             
-        bundlename = self.fetch_products(productTable=productTable, ix_selected_products=ix_selected_products)
-        print(f"Bundle name: {bundlename}")
-
-        # use token if available
-        if token is None:
-            token = self.params["token"]
-        print('TOKEN:',token)
-
-        if ix_selected_products is None:
-            ix_selected_products = self.ix_selected_products
-        
-        uri_list_str = '&'.join(["uri=" + x for x in productTable.t.loc[ix_selected_products,'dataURI']])
-        print(uri_list_str)      
-
-        productTable.t['dl_code']=0
-        productTable.t['dl_str']='bla'
-
-        
-#        if 'dl_code' not in self.imoutcols: self.imoutcols.append('dl_code')
-#        if 'dl_str' not in self.imoutcols: self.imoutcols.append('dl_str')
-        
-        ixs_exist = productTable.ix_equal('dl_code',2,indices = ix_selected_products)
-
-        if not self.params['clobber']:
-            ixs_download = AnotB(ix_selected_products,ixs_exist)
-            print(f'\n###############################\n### Downloading {len(ixs_download)} files')
-            if len(ixs_exist)>0: print(f'### skipping {len(ixs_exist)} since they already exist')
-        else:
-            ixs_download = ix_selected_products
-            print(f'\n###############################\n### Downloading {len(ixs_download)} files')
-            if len(ixs_exist)>0: print(f'### clobbering {len(ixs_exist)} that already exist')
-        
-        if ask_confirm_download:
-            do_it = input('Do you want to continue and download these products [y/n]?  ')
-            if do_it.lower() in ['y','yes']:
-                pass
-            elif do_it.lower() in ['n','no']:
-                print('OK, stopping....')
-                sys.exit(0)
-            else:
-                print(f'Hmm, \'{do_it}\' is neither yes or no. Don\'t know what to do, so stopping ....')
-                sys.exit(0)
-                
-        counter = 1
-        successcounter=0
-        failedcounter=0
-        for ix in ixs_download:
-            print(f'\n### Downloading #{counter} out of {len(ixs_download)} files (status: {successcounter} successful, {failedcounter} failed): {os.path.basename(productTable.t.loc[ix,"outfilename"])}')
-            (dl_code,dl_str) = self.download_product(productTable, ix, bundlename, clobber=self.params['clobber'], token=token)
-            sys.exit(0)
-        
-            productTable.t.loc[ix,'dl_code']=dl_code
-            productTable.t.loc[ix,'dl_str']=dl_str
-            if dl_code<=2:
-                successcounter+=1
-            else:
-                failedcounter+=1
-            counter+=1
-        
-        print(f'\n### Download complete: {successcounter} successful, {failedcounter} failed\n###############################')
-        return(0)
-
-    def download_products(self, productTable=None, ix_selected_products=None, clobber=False, ask_confirm_download=True):
-
-        if productTable==None:
-           productTable=self.productTable
-
-        if ix_selected_products is None:
-            ix_selected_products = self.ix_selected_products
-            
-
-
-        
-        uri_list_str = '&'.join(["uri=" + x for x in productTable.t.loc[ix_selected_products,'dataURI']])
-        print(uri_list_str)      
-
-        productTable.t['dl_code']=0
-        productTable.t['dl_str']='bla'
-
-        
 #        if 'dl_code' not in self.imoutcols: self.imoutcols.append('dl_code')
 #        if 'dl_str' not in self.imoutcols: self.imoutcols.append('dl_str')
         
@@ -311,21 +199,25 @@ if __name__ == '__main__':
     parser = download.define_options()
     args = parser.parse_args()
 
-    # the arguments are saved in download.params
+    # The config file is loaded into self.params, and overwritten with the arguments that are not None
     download.get_arguments(args)
     if download.verbose>2:
         print('params:', download.params)
-        
-    download.login(raiseErrorFlag=True)
-        
-    # set the outdir, based on arguments --outrootdir, --outsubdir. If no outsubdir is specified, the propID is used.
-    download.set_outdir()
 
+    # use arguments or $API_MAST_TOKEN to login       
+    download.login(raiseErrorFlag=True)
+    
+    # self.outdir is set depending on outrootdir and outsubdir in cfg file or through the options --outrootdir and --outsubdir
+    download.set_outdir()
+    if download.verbose: print(f'Outdir: {download.outdir}')
+        
     # make the tables, but don't show them yet, since the output files need to be updated first  
     download.mk_all_tables(showtables=True)
     
-    if not args.skipdownload:
+    if not args.skipdownload and len(download.obsTable.t)>0:
         download.download_products()
+        print('\n######################\n### Downloaded Selected Products:\n######################')
+        download.productTable.write(indices=download.ix_selected_products,columns=download.params['outcolumns_productTable'])
         
     
 
