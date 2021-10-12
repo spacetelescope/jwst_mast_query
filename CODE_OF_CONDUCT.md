@@ -2,9 +2,9 @@
 
 ## Introduction
 
-This code of conduct applies to all spaces related to the `target-coverage-tool` project, including all public and private mailing lists, repositories, issue trackers, wikis, and any other communication channel used by our community.
+This code of conduct applies to all spaces related to the `jwst_mast_query` project, including all public and private mailing lists, repositories, issue trackers, wikis, and any other communication channel used by our community.
 
-This code of conduct should be honored by everyone who participates in the `target-coverage-tool` project formally or informally, or claims any affiliation with the project, in any project-related activities and especially when representing the project, in any role.
+This code of conduct should be honored by everyone who participates in the `jwst_mast_query` project formally or informally, or claims any affiliation with the project, in any project-related activities and especially when representing the project, in any role.
 
 This code is not exhaustive or complete. It serves to distill our common understanding of a collaborative, shared environment and goals. Please try to follow this code in spirit as much as in letter, to create a friendly and productive environment that enriches the surrounding community.
 

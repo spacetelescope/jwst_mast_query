@@ -82,6 +82,8 @@ setup(
         'astropy',
         'numpy',
         'pandas',
+        'pyyaml',
+        'scipy',
         'argparse'
     ],
     include_package_data=True,
