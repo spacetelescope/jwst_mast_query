@@ -955,7 +955,12 @@ if __name__ == '__main__':
     if query.verbose>2:
         print('params:', query.params)
 
+    # use arguments or $API_MAST_TOKEN to login       
     query.login(raiseErrorFlag=False)
+        
+    # self.outdir is set depending on outrootdir and outsubdir in cfg file or through the options --outrootdir and --outsubdir
+    query.set_outdir()
+    if query.verbose: print(f'Outdir: {query.outdir}')
         
     # make the tables  
     query.mk_all_tables()
