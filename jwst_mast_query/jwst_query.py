@@ -3,7 +3,7 @@
 """
 Created on Wed July 28 11:01:23 2021
 
-@author: arest
+@author: arest, bhilbert
 """
 from astroquery.mast import Mast
 from astropy.time import Time
@@ -684,7 +684,8 @@ class query_mast:
 
 
         if not skip_propID2outsubdir:
-            outdir += f'/{productTable.t.loc[ix,"proposal_id"]}'
+            #outdir += f'/{productTable.t.loc[ix,"proposal_id"]}'
+            outdir += '/{:05d}'.format(productTable.t.loc[ix,"proposal_id"])
         
         if obsnum2outsubdir:
             if productTable.t.loc[ix,"obsnum"] is pd.NA:
