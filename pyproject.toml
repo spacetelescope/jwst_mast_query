@@ -1,0 +1,5 @@
+# pyproject.toml
+[build-system]
+requires = ["setuptools<=57.4.0",
+			"wheel",
+			"setuptools_scm"]
