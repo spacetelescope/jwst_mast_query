@@ -151,6 +151,8 @@ class download_mast(query_mast):
             ixs_download = ix_selected_products
             print(f'\n###############################\n### Downloading {len(ixs_download)} files')
             if len(ixs_exist)>0: print(f'### clobbering {len(ixs_exist)} that already exist')
+
+        print(f'Outdir: {self.outdir}/<proposal_id> where <proposal_id> is the value in the proposal_id column')
         
         if ask_confirm_download:
             do_it = input('Do you want to continue and download these products [y/n]?  ')

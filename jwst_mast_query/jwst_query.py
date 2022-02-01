@@ -76,8 +76,10 @@ class query_mast:
         #self.RET_COLUMNS = ['proposal_id','dataURL','obsid','obs_id','t_min','t_exptime']
         self.SERVICES = {
                 'SI_search': 'Mast.Jwst.Filtered.',
-                'Caom_search':'Mast.Caom.Filtered.JwstOps',
-                'Product_search':'Mast.Caom.Products.JwstOps'
+#                'Caom_search':'Mast.Caom.Filtered.JwstOps',
+#                'Product_search':'Mast.Caom.Products.JwstOps'
+                'Caom_search':'Mast.Caom.Filtered',
+                'Product_search':'Mast.Caom.Products'
                 }
         
         self.verbose = 0
@@ -175,7 +177,7 @@ class query_mast:
         parser.add_argument('--token', type=str, default=defaulttoken, help='MAST API token. You can also set the token in the environment variable \$MAST_API_TOKEN')
 
         parser.add_argument('--outrootdir', default=None, help='output root directory (default=%(default)s)')
-        parser.add_argument('--outsubdir', default=None, help='osubdir added to utput root directory (default=%(default)s)')
+        parser.add_argument('--outsubdir', default=None, help='outsubdir added to output root directory (default=%(default)s)')
         parser.add_argument('--skip_propID2outsubdir', action='store_true', default=None, help='By default, the APT proposal ID is added as a subdir to the output directory. You can skip this with this option (default=%(default)s)')
         parser.add_argument('--skip_check_if_outfile_exists', action='store_true', default=None,help='Don\'t check if output files exists. This makes it faster for large lists')        
 
