@@ -157,6 +157,13 @@ class query_mast:
         else:
             cfgfilename = None
 
+        # default for config file, if available
+        #if 'JWST_QUERY_OUTDIR' in os.environ and os.environ['JWST_QUERY_OUTDIR'] != '':
+        #    defaultoutdir = os.environ['JWST_QUERY_OUTDIR']
+        #else:
+        #    defaultoutdir = None
+
+
         # default for token is $MAST_API_TOKEN
         if 'MAST_API_TOKEN' in os.environ:
             defaulttoken = os.environ['MAST_API_TOKEN']
