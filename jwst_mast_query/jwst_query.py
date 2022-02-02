@@ -179,7 +179,8 @@ class query_mast:
         parser.add_argument('--outrootdir', default=None, help='output root directory (default=%(default)s)')
         parser.add_argument('--outsubdir', default=None, help='outsubdir added to output root directory (default=%(default)s)')
         parser.add_argument('--skip_propID2outsubdir', action='store_true', default=None, help='By default, the APT proposal ID is added as a subdir to the output directory. You can skip this with this option (default=%(default)s)')
-        parser.add_argument('--skip_check_if_outfile_exists', action='store_true', default=None,help='Don\'t check if output files exists. This makes it faster for large lists')        
+        parser.add_argument('--skip_check_if_outfile_exists', action='store_true', default=None, help='Don\'t check if output files exists. This makes it faster for large lists, but files might be reloaded')        
+        parser.add_argument('--skip_check_filesize', action='store_true', default=None, help='Don\'t check if output files have the correct filesize. This makes it faster for large lists, but files might be corrupted.')        
 
         parser.add_argument('-e','--obsid_select', nargs="+", default=[], help='Specify obsid range applied to "obsID" column in the PRODUCT table. If single value, then exact match. If single value has "+" or "-" at the end, then it is a lower and upper limit, respectively. If two values, then range. Examples: 385539+, 385539-, 385539 385600 (default=%(default)s)')
         parser.add_argument('-l','--obsid_list', nargs="+", default=[], help='Specify list of obsid applied to "obsID" column in the PRODUCT table. examples: 385539 385600 385530 (default=%(default)s)')
@@ -397,6 +398,7 @@ class query_mast:
             mjd_max = Time.now().mjd+0.1
 
         return(mjd_min, mjd_max)
+    
     def observation_query(self, propID=None, instrument=None, mjd_min=None, mjd_max=None, token=None):
         '''
         Perform query for observations matching JWST instrument and program ID
@@ -456,6 +458,10 @@ class query_mast:
             self.obsTable.t['proposal_id']=self.obsTable.t['proposal_id'].astype('int')
         if 'obsid' in self.obsTable.t.columns:
             self.obsTable.t['obsid']=self.obsTable.t['obsid'].astype('int')
+
+        self.obsTable.t.style.set_properties(subset=["obs_id"], **{'text-align': 'left'})
+        #self.obsTable.default_formatters['obs_id']='{:<}'.format
+        
 
         if self.verbose>1: print('Obstable columns:',self.obsTable.t.columns)
 
@@ -617,13 +623,14 @@ class query_mast:
             print('\n#### Selecting products....')
 
         # if necessary, add leading '_' and suffix '.fits'
-        for i in range(len(filetypes)):
-            if re.search('^_',filetypes[i]) is None:
-                filetypes[i] = '_'+filetypes[i]
-            if re.search('\.',filetypes[i]) is None:
-                filetypes[i] += '.fits'
+        if filetypes is not None:
+            for i in range(len(filetypes)):
+                if re.search('^_',filetypes[i]) is None:
+                    filetypes[i] = '_'+filetypes[i]
+                if re.search('\.',filetypes[i]) is None:
+                    filetypes[i] += '.fits'
         
-        print('allowed filetype list:',filetypes)
+            print('allowed filetype list:',filetypes)
 
         ix_products = self.productTable.getindices()
         # remove guide stars if wanted...
@@ -649,24 +656,28 @@ class query_mast:
             
         # Loop trough the filetypes and get all entries from ix_products list
         self.ix_selected_products = []
-        for filetype in filetypes:
+        if filetypes is not None:
+            for filetype in filetypes:
+                
+                # make sure the '.' in the regular expression is literal, and also add '$' to the end
+                regex=re.sub('\.','\.',filetype)+'$'
+                
+                # get the indices for matching filetype ...
+                ix_matching_filetype = self.productTable.ix_matchregex('filetype',regex,indices=ix_products)
+                # ... and add them to the list of good indices
+                self.ix_selected_products.extend(ix_matching_filetype)
             
-            # make sure the '.' in the regular expression is literal, and also add '$' to the end
-            regex=re.sub('\.','\.',filetype)+'$'
-            
-            # get the indices for matching filetype ...
-            ix_matching_filetype = self.productTable.ix_matchregex('filetype',regex,indices=ix_products)
-            # ... and add them to the list of good indices
-            self.ix_selected_products.extend(ix_matching_filetype)
-        
-            if self.verbose>1:
-                print('%d products with filetype regex matching %s' % (len(ix_matching_filetype),regex))
+                if self.verbose>1:
+                    print('%d products with filetype regex matching %s' % (len(ix_matching_filetype),regex))
+            if self.verbose:
+                print('%d products with correct filetypes left' % (len(self.ix_selected_products)))
+        else:
+            self.ix_selected_products = ix_products
+            self.params['filetypes'] = unique(self.productTable.t['filetype'])
         
         self.ix_selected_products = self.productTable.ix_sort_by_cols(self.params['sortcols_productTable'],indices=self.ix_selected_products)
 
         
-        if self.verbose:
-            print('%d products with correct filetypes left' % (len(self.ix_selected_products)))
 
         return(self.ix_selected_products)
     
@@ -675,7 +686,8 @@ class query_mast:
                        skip_propID2outsubdir=False, 
                        obsnum2outsubdir=False, 
                        #info2filename=False,
-                       skip_check_if_outfile_exists=False):
+                       skip_check_if_outfile_exists=False,
+                       skip_check_filesize=False):
 
 
         if outdir is None:
@@ -703,8 +715,19 @@ class query_mast:
     
         if not skip_check_if_outfile_exists:
             if os.path.exists(fullfilename):
-                productTable.t.loc[ix,'dl_code'] = 2
-                productTable.t.loc[ix,'dl_str'] = 'exists'
+                if not skip_check_filesize:
+#                    print('VVV',productTable.t.loc[ix,'outfilename'],productTable.t.loc[ix,'size'],os.path.getsize(productTable.t.loc[ix,'outfilename']))
+                    outfile_filesize = os.path.getsize(productTable.t.loc[ix,'outfilename'])
+                    if outfile_filesize != int(productTable.t.loc[ix,'size']):
+                        productTable.t.loc[ix,'dl_code'] = 4
+                        productTable.t.loc[ix,'dl_str'] = 'ERRfilesize'
+                    else:
+                        productTable.t.loc[ix,'dl_code'] = 2
+                        productTable.t.loc[ix,'dl_str'] = 'exists'
+                else:
+                    productTable.t.loc[ix,'dl_code'] = 2
+                    productTable.t.loc[ix,'dl_str'] = 'exists'
+
             else:
                 productTable.t.loc[ix,'dl_code'] = 0
                 productTable.t.loc[ix,'dl_str'] = None
@@ -733,7 +756,8 @@ class query_mast:
                         outdir=None,
                         skip_propID2outsubdir=False, 
 #                        info2filename=False,
-                        skip_check_if_outfile_exists=False):
+                        skip_check_if_outfile_exists=False,
+                        skip_check_filesize=False):
         
         if productTable==None:
            productTable=self.productTable
@@ -755,7 +779,8 @@ class query_mast:
                                 ix, 
                                 outdir=outdir,
                                 skip_propID2outsubdir=skip_propID2outsubdir, 
-                                skip_check_if_outfile_exists=skip_check_if_outfile_exists)
+                                skip_check_if_outfile_exists=skip_check_if_outfile_exists,
+                                skip_check_filesize=skip_check_filesize)
         return(self.ix_selected_products)
 
 
@@ -919,7 +944,8 @@ class query_mast:
         
         # definte the output filenames, and check if they exist.
         self.mk_outfilenames(skip_propID2outsubdir=self.params['skip_propID2outsubdir'],
-                             skip_check_if_outfile_exists=self.params['skip_check_if_outfile_exists'])
+                             skip_check_if_outfile_exists=self.params['skip_check_if_outfile_exists'],
+                             skip_check_filesize=self.params['skip_check_filesize'])
         
         # update obsTable with selected products: count the different filetypes, and also update the obsnum if None in obsTable
         self.update_obsTable_with_selectedProducts()

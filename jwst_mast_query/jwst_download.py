@@ -96,9 +96,10 @@ class download_mast(query_mast):
             print('ERROR: outfilename is empty string!')
             return(4,'ERRORempty')
 
-        if os.path.exists(outfilename) and not clobber:
-            print(f'WARNING: {outfilename} exists and clobber=False, thus skipping re-downloading it!')
-            return(2,'exists')
+#        if os.path.exists(outfilename):
+#            if not clobber and :
+#            print(f'WARNING: {outfilename} exists and clobber=False, thus skipping re-downloading it!')
+#            return(2,'exists')
 
         makepath4file(outfilename)
 
@@ -171,6 +172,7 @@ class download_mast(query_mast):
         
         mastURL = self.JwstObs._portal_api_connection.MAST_DOWNLOAD_URL + "?uri="
 
+        ixs_download = productTable.ix_sort_by_cols(['proposal_id','obsnum'],indices=ixs_download)
 
         for ix in ixs_download:
             print(f'\n### Downloading #{counter} out of {len(ixs_download)} files (status: {successcounter} successful, {failedcounter} failed): {os.path.basename(productTable.t.loc[ix,"outfilename"])}')
