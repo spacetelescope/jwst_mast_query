@@ -16,7 +16,7 @@ import argparse,os,sys,re,types
 import yaml
 
 # pdastroclass is wrapper around pandas.
-from pdastro import pdastroclass,unique,AnotB
+from pdastro import pdastroclass,unique,AnotB,AorB
 
 
 # MAST API documentation:
@@ -189,8 +189,8 @@ class query_mast:
         parser.add_argument('--skip_check_if_outfile_exists', action='store_true', default=None, help='Don\'t check if output files exists. This makes it faster for large lists, but files might be reloaded')        
         parser.add_argument('--skip_check_filesize', action='store_true', default=None, help='Don\'t check if output files have the correct filesize. This makes it faster for large lists, but files might be corrupted.')        
 
-        parser.add_argument('-e','--obsid_select', nargs="+", default=[], help='Specify obsid range applied to "obsID" column in the PRODUCT table. If single value, then exact match. If single value has "+" or "-" at the end, then it is a lower and upper limit, respectively. If two values, then range. Examples: 385539+, 385539-, 385539 385600 (default=%(default)s)')
-        parser.add_argument('-l','--obsid_list', nargs="+", default=[], help='Specify list of obsid applied to "obsID" column in the PRODUCT table. examples: 385539 385600 385530 (default=%(default)s)')
+        parser.add_argument('-e','--obsid_select', nargs="+", default=[], help='Specify obsid range applied to "obsID" and "parent_obsid" columns in the PRODUCT table. If single value, then exact match. If single value has "+" or "-" at the end, then it is a lower and upper limit, respectively. If two values, then range. Examples: 385539+, 385539-, 385539 385600 (default=%(default)s)')
+        parser.add_argument('-l','--obsid_list', nargs="+", default=[], help='Specify list of obsid applied to "obsID" and "parent_obsid" columns in the PRODUCT table. examples: 385539 385600 385530 (default=%(default)s)')
 
         time_group = parser.add_argument_group("Time constraints for the observation/product search")
 
@@ -331,7 +331,9 @@ class query_mast:
             if limits[i] is not None: limits[i]=int(limits[i])
 
         ixs = self.productTable.ix_remove_null('obsID',indices=ix_selected_products)
-        ixs_keep = self.productTable.ix_inrange('obsID',limits[0],limits[1],indices=ixs)
+        ixs_keep1 = self.productTable.ix_inrange('obsID',limits[0],limits[1],indices=ixs)
+        ixs_keep2 = self.productTable.ix_inrange('parent_obsid',limits[0],limits[1],indices=ixs)
+        ixs_keep = unique(AorB(ixs_keep1,ixs_keep2))
         print(f'obsid cut {limits[0]} - {limits[1]}: keeping {len(ixs_keep)} from {len(ixs)}')
         return(ixs_keep)
 
@@ -353,6 +355,9 @@ class query_mast:
             obsid = int(obsid)
             ixs2add = self.productTable.ix_equal('obsID',obsid,indices=ix_selected_products)
             ixs_keep.extend(ixs2add)
+            ixs2add = self.productTable.ix_equal('parent_obsid',obsid,indices=ix_selected_products)
+            ixs_keep.extend(ixs2add)
+        ixs_keep = unique(ixs_keep)
         print(f'obsid list cut: keeping {len(ixs_keep)} from {len(ix_selected_products)}')
         return(ixs_keep)
 
@@ -651,7 +656,6 @@ class query_mast:
             
         if calib_levels is not None:
             ix_calib_level = []
-            print('VVVVVVVVVVv',calib_levels)
             for calib_level in calib_levels:
                 ixs = self.productTable.ix_equal('calib_level',calib_level,indices=ix_products)
                 if self.verbose>1:
@@ -682,8 +686,8 @@ class query_mast:
             self.ix_selected_products = ix_products
             self.params['filetypes'] = unique(self.productTable.t['filetype'])
         
+        
         self.ix_selected_products = self.productTable.ix_sort_by_cols(self.params['sortcols_productTable'],indices=self.ix_selected_products)
-
         
 
         return(self.ix_selected_products)
