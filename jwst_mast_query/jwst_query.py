@@ -16,7 +16,7 @@ import argparse,os,sys,re,types
 import yaml
 
 # pdastroclass is wrapper around pandas.
-from pdastro import pdastroclass,unique,AnotB,AorB
+from pdastro import pdastroclass,unique,AnotB,AorB,AandB
 
 
 # MAST API documentation:
@@ -316,7 +316,7 @@ class query_mast:
                      productTable=None, 
                      ix_selected_products=None):
 
-        if productTable==None:
+        if productTable is None:
            productTable=self.productTable
            
         if ix_selected_products is None:
@@ -341,7 +341,7 @@ class query_mast:
                      productTable=None, 
                      ix_selected_products=None):
 
-        if productTable==None:
+        if productTable is None:
            productTable=self.productTable
            
         if ix_selected_products is None:
@@ -494,10 +494,10 @@ class query_mast:
         None.
 
         """
-        if obsTable==None:
+        if obsTable is None:
             obsTable=self.obsTable
 
-        if productTable==None:
+        if productTable is None:
            productTable=self.productTable
 
         self.obsTable.t['obsnum']=pd.Series(self.obsTable.t['obsnum'],dtype=pd.Int32Dtype())
@@ -599,7 +599,7 @@ class query_mast:
             if m is not None:
                 self.productTable.t.loc[ix,'obsnum']=int(m.groups()[0])
             else:
-                self.productTable.t.loc[ix,'obsnum']=None
+                self.productTable.t.loc[ix,'obsnum']=np.nan
 
         # make proposal_id integer
         self.productTable.t['proposal_id']=self.productTable.t['proposal_id'].astype('int')
@@ -622,13 +622,13 @@ class query_mast:
         '''
         Filter the list of products based on the filetype (or better suffix)
         '''
-        if productTable==None:
+        if productTable is None:
            productTable=self.productTable
         
-        if filetypes==None:
+        if filetypes is None:
             filetypes=self.params['filetypes']
 
-        if calib_levels==None:
+        if calib_levels is None:
             calib_levels=self.params['calib_levels']
 
         if self.verbose: 
@@ -637,6 +637,9 @@ class query_mast:
         # if necessary, add leading '_' and suffix '.fits'
         if filetypes is not None:
             for i in range(len(filetypes)):
+                if filetypes[i] in ['fits','jpg']:
+                    filetypes[i]+='$'
+                    continue
                 if re.search('^_',filetypes[i]) is None:
                     filetypes[i] = '_'+filetypes[i]
                 if re.search('\.',filetypes[i]) is None:
@@ -684,13 +687,37 @@ class query_mast:
                 print('%d products with correct filetypes left' % (len(self.ix_selected_products)))
         else:
             self.ix_selected_products = ix_products
-            self.params['filetypes'] = unique(self.productTable.t['filetype'])
         
+        # get the list of valid filetypes that exist
+        self.params['filetypes'] = unique(self.productTable.t.loc[self.ix_selected_products,'filetype'])
         
         self.ix_selected_products = self.productTable.ix_sort_by_cols(self.params['sortcols_productTable'],indices=self.ix_selected_products)
         
 
         return(self.ix_selected_products)
+    
+    def update_obstable_indices(self, ixs_prod, ix_obs_sorted=None, obsTable=None, productTable=None):
+        if obsTable is None:
+            obsTable=self.obsTable
+
+        if productTable is None:
+           productTable=self.productTable
+           
+        if ix_obs_sorted is None:
+            ix_obs_sorted = self.ix_obs_sorted
+
+        # get all parent_obsids of the selected products
+        obsids = unique(productTable.t.loc[ixs_prod,'parent_obsid'])
+        
+        # get all keys in observation table that are associated with these obsids
+        new_ix_obs_sorted = []
+        for obsid in obsids:
+            new_ix_obs_sorted.extend(self.obsTable.ix_equal('obsid',obsid,indices=ix_obs_sorted))
+
+        # Keep the order from ix_obs_sorted!
+        new_ix_obs_sorted = AandB(ix_obs_sorted,new_ix_obs_sorted)
+        
+        return(new_ix_obs_sorted)
     
     def mk_outfilename(self, productTable, ix, 
                        outdir=None,
@@ -770,7 +797,7 @@ class query_mast:
                         skip_check_if_outfile_exists=False,
                         skip_check_filesize=False):
         
-        if productTable==None:
+        if productTable is None:
            productTable=self.productTable
            
         if ix_selected_products is None:
@@ -813,16 +840,16 @@ class query_mast:
         None.
 
         """
-        if obsTable==None:
+        if obsTable is None:
             obsTable=self.obsTable
 
-        if productTable==None:
+        if productTable is None:
            productTable=self.productTable
 
         if ix_selected_products is None:
             ix_selected_products = self.ix_selected_products
        
-        if filetypes==None:
+        if filetypes is None:
             filetypes=self.params['filetypes']
         # add the filetypes to the output columns of obsTable
         for filetype in filetypes:
@@ -850,11 +877,15 @@ class query_mast:
 
         return(0)
             
-    def mk_summary_tables(self, obsTable=None, filetypes=None):
-        if obsTable==None:
+    def mk_summary_tables(self, obsTable=None, ix_obs_sorted=None, filetypes=None):
+        if obsTable is None:
             obsTable=self.obsTable
+            
+        if ix_obs_sorted is None:
+            ix_obs_sorted = self.ix_obs_sorted
 
-        if filetypes==None:
+
+        if filetypes is None:
             filetypes=self.params['filetypes']
             
         # Add the filetypes to the summary table column
@@ -867,9 +898,9 @@ class query_mast:
         self.summary.t['proposal_id']=pd.Series(dtype=pd.Int64Dtype())
         
         #Loop through each propID
-        propIDs = unique(obsTable.t['proposal_id'])
+        propIDs = unique(obsTable.t.loc[ix_obs_sorted,'proposal_id'])
         for propID in propIDs:
-            ixs_propID =  obsTable.ix_equal('proposal_id',propID)
+            ixs_propID =  obsTable.ix_equal('proposal_id',propID,indices=ix_obs_sorted)
 
             ixs_propID_notnull = obsTable.ix_remove_null('obsnum', indices=ixs_propID)
             obsnums = unique(obsTable.t.loc[ixs_propID_notnull,'obsnum'])
@@ -952,6 +983,8 @@ class query_mast:
         self.ix_selected_products = self.obsid_select(self.params['obsid_select'])
         self.ix_selected_products = self.obsid_list(self.params['obsid_list'])
 
+        # only keep entries in the obstable that are parent_obsid in product table
+        self.ix_obs_sorted = self.update_obstable_indices(self.ix_selected_products)
         
         # definte the output filenames, and check if they exist.
         self.mk_outfilenames(skip_propID2outsubdir=self.params['skip_propID2outsubdir'],

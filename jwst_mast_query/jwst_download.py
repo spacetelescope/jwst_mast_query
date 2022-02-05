@@ -130,7 +130,7 @@ class download_mast(query_mast):
 
     def download_products(self, productTable=None, ix_selected_products=None, clobber=None, ask_confirm_download=True):
 
-        if productTable==None:
+        if productTable is None:
            productTable=self.productTable
 
         if ix_selected_products is None:
