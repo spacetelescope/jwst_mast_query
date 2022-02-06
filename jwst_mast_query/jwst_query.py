@@ -132,7 +132,7 @@ class query_mast:
         # output columns for the tables. Note that the columns for the individual filetypes
         # are automatically added to the obsTable
         # These are the default values, they can be changed in the config file
-        self.params['outcolumns_productTable']=['proposal_id','obsnum','obsID','parent_obsid','obs_id','dataproduct_type','productFilename','filetype','calib_level','size','description']
+        self.params['outcolumns_productTable']=['proposal_id','obsnum','obsID','parent_obsid','obs_id','sca','dataproduct_type','productFilename','filetype','calib_level','size','description']
         self.params['outcolumns_obsTable']=['proposal_id','obsnum','obsid','obs_id','t_min','t_exptime','date_min']
 
         # The productTable is sorted based on these columns  (can also be set in config file)
@@ -191,6 +191,7 @@ class query_mast:
 
         parser.add_argument('-e','--obsid_select', nargs="+", default=[], help='Specify obsid range applied to "obsID" and "parent_obsid" columns in the PRODUCT table. If single value, then exact match. If single value has "+" or "-" at the end, then it is a lower and upper limit, respectively. If two values, then range. Examples: 385539+, 385539-, 385539 385600 (default=%(default)s)')
         parser.add_argument('-l','--obsid_list', nargs="+", default=[], help='Specify list of obsid applied to "obsID" and "parent_obsid" columns in the PRODUCT table. examples: 385539 385600 385530 (default=%(default)s)')
+        parser.add_argument('--sca', nargs="+", default=None, choices=['a1','a2','a3','a4','along','b1','b2','b3','b4','blong'], help='Specify list of sca\'s to select')
 
         time_group = parser.add_argument_group("Time constraints for the observation/product search")
 
@@ -359,6 +360,30 @@ class query_mast:
             ixs_keep.extend(ixs2add)
         ixs_keep = unique(ixs_keep)
         print(f'obsid list cut: keeping {len(ixs_keep)} from {len(ix_selected_products)}')
+        return(ixs_keep)
+
+    def select_sca(self, sca_list,
+                   productTable=None, 
+                   ix_selected_products=None):
+
+        if productTable is None:
+           productTable=self.productTable
+           
+        if ix_selected_products is None:
+            ix_selected_products = self.ix_selected_products
+        
+        if sca_list is None or len(sca_list)==0:
+            return(ix_selected_products)
+        
+        if isinstance(sca_list,str):
+            sca_list=[sca_list]
+
+        ixs_keep = []
+        for sca in sca_list:
+            ixs2add = self.productTable.ix_equal('sca',sca,indices=ix_selected_products)
+            ixs_keep.extend(ixs2add)
+        ixs_keep = unique(ixs_keep)
+        print(f'select sca {sca_list}: keeping {len(ixs_keep)} from {len(ix_selected_products)}')
         return(ixs_keep)
 
             
@@ -589,6 +614,7 @@ class query_mast:
         # fill the suffix column with the suffix of the form _bla1.bla2, e.g. _uncal.fits
         # This will later be used to figure out
         self.productTable.t['filetype'] = self.productTable.t['productFilename'].str.extract(r'(\_[a-zA-Z0-9]+\.[a-zA-Z0-9]+)$')
+        self.productTable.t['sca'] = self.productTable.t['obs_id'].str.extract(r'_nrc([a-zA-Z0-9]+$)')
 
         # Find the obsnum # from the filename if possible.
         ixs = self.productTable.getindices()
@@ -982,6 +1008,10 @@ class query_mast:
         # make some obsid cuts!
         self.ix_selected_products = self.obsid_select(self.params['obsid_select'])
         self.ix_selected_products = self.obsid_list(self.params['obsid_list'])
+        
+        # get selected SCAs if specified
+        self.ix_selected_products = self.select_sca(self.params['sca'])
+                
 
         # only keep entries in the obstable that are parent_obsid in product table
         self.ix_obs_sorted = self.update_obstable_indices(self.ix_selected_products)
