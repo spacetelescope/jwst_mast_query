@@ -17,7 +17,7 @@ import yaml
 
 # pdastroclass is wrapper around pandas.
 from pdastro import pdastroclass,unique,AnotB,AorB,AandB
-
+import platform
 
 # MAST API documentation:
 # https://mast.stsci.edu/api/v0/pyex.html
@@ -318,7 +318,12 @@ class query_mast:
                 print("Warning: no token given, could not login, only public requests possible")
                 return(1)
         else:
-            self.JwstObs.login(token=token, store_token=False)
+            if platform.processor() == 'arm':
+                store_token = False
+            else:
+                store_token = True
+            
+            self.JwstObs.login(token=token, store_token=store_token)
         return(0)
 
     def obsid_select(self,obsid_select,
