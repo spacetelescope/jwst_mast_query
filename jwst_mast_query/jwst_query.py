@@ -174,7 +174,7 @@ class query_mast:
         parser.add_argument('-i', '--instrument', type=str, default=None, choices=['niriss','nircam','nirspec','miri','fgs'], help='Instrument.  (default=%(default)s)')
 
         parser.add_argument('-v','--verbose', default=0, action='count')
-        parser.add_argument('--propID', type=int, default=None, help='Search for data for this proposal ID(=APT #) only.')
+        parser.add_argument('--propID', type=int, nargs="+", default=None, help='Search for data for this proposal ID(=APT #) only. If more than one argument: all following arguments are a list of obsnum\'s')
         parser.add_argument('--guidestars', action='store_true', default=None, help='Don\'t skip guidestars. By default, they are skipped')
         parser.add_argument('-f','--filetypes',  type=str, nargs="+", default=None, help=('List of product filetypes to get, e.g., _uncal.fits or _uncal.jpg. If only letters, then _ and .fits are added, for example uncal gets expanded to _uncal.fits. Typical image filetypes are uncal, rate, rateints, cal (default=%(default)s)'))
         parser.add_argument('--calib_levels',  type=int, nargs="+", default=None, help=('Only select products with the specified calibration levels (calib_level column in productTable) (default=%(default)s)'))
@@ -191,7 +191,8 @@ class query_mast:
 
         parser.add_argument('-e','--obsid_select', nargs="+", default=[], help='Specify obsid range applied to "obsID" and "parent_obsid" columns in the PRODUCT table. If single value, then exact match. If single value has "+" or "-" at the end, then it is a lower and upper limit, respectively. If two values, then range. Examples: 385539+, 385539-, 385539 385600 (default=%(default)s)')
         parser.add_argument('-l','--obsid_list', nargs="+", default=[], help='Specify list of obsid applied to "obsID" and "parent_obsid" columns in the PRODUCT table. examples: 385539 385600 385530 (default=%(default)s)')
-        parser.add_argument('--sca', nargs="+", default=None, choices=['a1','a2','a3','a4','along','b1','b2','b3','b4','blong'], help='Specify list of sca\'s to select')
+        parser.add_argument('--obnum_list', nargs="+", default=[], help='Specify list of obsnum (default=%(default)s)')
+        parser.add_argument('--sca', nargs="+", default=None, choices=['a1','a2','a3','a4','a5','along','b1','b2','b3','b4','b5','blong'], help='Specify list of sca\'s to select. a5=along, b5=blong')
 
         time_group = parser.add_argument_group("Time constraints for the observation/product search")
 
@@ -285,8 +286,14 @@ class query_mast:
                     self.params[arg]=None
                 
         # propID
+        self.params['obsnums']=None
         if self.params['propID'] is not None:
-            self.params['propID'] = '%05d' % (int(self.params['propID']))
+            print(self.params['propID'])
+            if len(self.params['propID'])>1:
+                self.params['obsnums'] = self.params['propID'][1:]
+            self.params['propID'] = '%05d' % (int(self.params['propID'][0]))
+        print('propID',self.params['propID'])
+        print('obsnums',self.params['obsnums'])
         self.verbose = self.params['verbose']
         
         if self.verbose>2:
@@ -380,11 +387,38 @@ class query_mast:
 
         ixs_keep = []
         for sca in sca_list:
+            if sca=='a5': sca='along'
+            if sca=='b5': sca='blong'
             ixs2add = self.productTable.ix_equal('sca',sca,indices=ix_selected_products)
             ixs_keep.extend(ixs2add)
         ixs_keep = unique(ixs_keep)
         print(f'select sca {sca_list}: keeping {len(ixs_keep)} from {len(ix_selected_products)}')
         return(ixs_keep)
+    
+    def select_obsnums(self, obsnum_list,
+                       productTable=None, 
+                       ix_selected_products=None):
+
+        if productTable is None:
+           productTable=self.productTable
+           
+        if ix_selected_products is None:
+            ix_selected_products = self.ix_selected_products
+        
+        if obsnum_list is None or len(obsnum_list)==0:
+            return(ix_selected_products)
+        
+        if isinstance(obsnum_list,str):
+            obsnum_list=[obsnum_list]
+
+        ixs_keep = []
+        for obsnum in obsnum_list:
+            ixs2add = self.productTable.ix_equal('obsnum',obsnum,indices=ix_selected_products)
+            ixs_keep.extend(ixs2add)
+        ixs_keep = unique(ixs_keep)
+        print(f'select obsnum {obsnum_list}: keeping {len(ixs_keep)} from {len(ix_selected_products)}')
+        return(ixs_keep)
+
 
             
     def get_mjd_limits(self, lookbacktime=None, date_select=None, lre3=False, lre4=False, lre5=False, lre6=False):
@@ -461,9 +495,12 @@ class query_mast:
         # Only add propID entry if not None. If it is set to None it doesn't work!
         if propID is not None:
             params["filters"].append({"paramName":"proposal_id","values":[propID]})
-        
+
         if self.verbose: 
             print('\n#### Querying Obstable....')
+        if self.verbose>1:
+            print('query params:',params)
+        
         if token is not None:
             self.obsTable.t = self.JwstObs.service_request(service, params,mast_token=token).to_pandas()
         else:
@@ -478,13 +515,13 @@ class query_mast:
         # Find the obsnum # from the filename if possible.
         ixs = self.obsTable.getindices()
         obsnumsearch = re.compile('^jw\d{5}(\d{3})\d{3}\_')
-        self.obsTable.t['obsnum']=None
+        self.obsTable.t['obsnum']=pd.NA
         for ix in ixs:
             m = obsnumsearch.search(self.obsTable.t.loc[ix,'obs_id'])
             if m is not None:
                 self.obsTable.t.loc[ix,'obsnum']=int(m.groups()[0])
             else:
-                self.obsTable.t.loc[ix,'obsnum']=None
+                self.obsTable.t.loc[ix,'obsnum']=pd.NA
 
         self.obsTable.mjd2dateobs('t_min','date_min')
 
@@ -619,13 +656,13 @@ class query_mast:
         # Find the obsnum # from the filename if possible.
         ixs = self.productTable.getindices()
         obsnumsearch = re.compile('^jw\d{5}(\d{3})\d{3}\_')
-        self.productTable.t['obsnum']=None
+        self.productTable.t['obsnum']=pd.NA
         for ix in ixs:
             m = obsnumsearch.search(self.productTable.t.loc[ix,'obs_id'])
             if m is not None:
                 self.productTable.t.loc[ix,'obsnum']=int(m.groups()[0])
             else:
-                self.productTable.t.loc[ix,'obsnum']=np.nan
+                self.productTable.t.loc[ix,'obsnum']=pd.NA
 
         # make proposal_id integer
         self.productTable.t['proposal_id']=self.productTable.t['proposal_id'].astype('int')
@@ -832,7 +869,7 @@ class query_mast:
             
         
         productTable.t.loc[ix_selected_products,'outfilename'] = None
-        productTable.t.loc[ix_selected_products,'dl_code'] = np.nan
+        productTable.t.loc[ix_selected_products,'dl_code'] = pd.NA
         productTable.t.loc[ix_selected_products,'dl_str'] = None
         productTable.t['dl_code'] = productTable.t['dl_code'].astype(pd.Int32Dtype())
 #        if 'outfilename' not in self.imoutcols: self.imoutcols.append('outfilename')
@@ -981,7 +1018,7 @@ class query_mast:
         mjd_min, mjd_max = self.get_mjd_limits()
 
         # get the observations: stored in self.obsTable
-        self.observation_query(self.params['propID'], mjd_min = mjd_min, mjd_max = mjd_max)
+        self.observation_query(propID=self.params['propID'], mjd_min = mjd_min, mjd_max = mjd_max)
 
         if len(self.obsTable.t)==0:
             print('\n################################\nNO OBSERVATIONS FOUND! exiting....\n################################')
@@ -1005,6 +1042,9 @@ class query_mast:
         # the selected products indices are put into self.ix_selected_products
         self.product_filter()
         
+        # get selected obsnums if specified
+        self.ix_selected_products = self.select_obsnums(self.params['obsnums'])
+
         # make some obsid cuts!
         self.ix_selected_products = self.obsid_select(self.params['obsid_select'])
         self.ix_selected_products = self.obsid_list(self.params['obsid_list'])
