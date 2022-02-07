@@ -96,9 +96,10 @@ class download_mast(query_mast):
             print('ERROR: outfilename is empty string!')
             return(4,'ERRORempty')
 
-        if os.path.exists(outfilename) and not clobber:
-            print(f'WARNING: {outfilename} exists and clobber=False, thus skipping re-downloading it!')
-            return(2,'exists')
+#        if os.path.exists(outfilename):
+#            if not clobber and :
+#            print(f'WARNING: {outfilename} exists and clobber=False, thus skipping re-downloading it!')
+#            return(2,'exists')
 
         makepath4file(outfilename)
 
@@ -129,7 +130,7 @@ class download_mast(query_mast):
 
     def download_products(self, productTable=None, ix_selected_products=None, clobber=None, ask_confirm_download=True):
 
-        if productTable==None:
+        if productTable is None:
            productTable=self.productTable
 
         if ix_selected_products is None:
@@ -151,6 +152,8 @@ class download_mast(query_mast):
             ixs_download = ix_selected_products
             print(f'\n###############################\n### Downloading {len(ixs_download)} files')
             if len(ixs_exist)>0: print(f'### clobbering {len(ixs_exist)} that already exist')
+
+        print(f'Outdir: {self.outdir}/<proposal_id> where <proposal_id> is the value in the proposal_id column')
         
         if ask_confirm_download:
             do_it = input('Do you want to continue and download these products [y/n]?  ')
@@ -169,6 +172,7 @@ class download_mast(query_mast):
         
         mastURL = self.JwstObs._portal_api_connection.MAST_DOWNLOAD_URL + "?uri="
 
+        ixs_download = productTable.ix_sort_by_cols(['proposal_id','obsnum'],indices=ixs_download)
 
         for ix in ixs_download:
             print(f'\n### Downloading #{counter} out of {len(ixs_download)} files (status: {successcounter} successful, {failedcounter} failed): {os.path.basename(productTable.t.loc[ix,"outfilename"])}')

@@ -16,7 +16,7 @@ import argparse,os,sys,re,types
 import yaml
 
 # pdastroclass is wrapper around pandas.
-from pdastro import pdastroclass,unique,AnotB
+from pdastro import pdastroclass,unique,AnotB,AorB,AandB
 
 
 # MAST API documentation:
@@ -76,8 +76,8 @@ class query_mast:
         #self.RET_COLUMNS = ['proposal_id','dataURL','obsid','obs_id','t_min','t_exptime']
         self.SERVICES = {
                 'SI_search': 'Mast.Jwst.Filtered.',
-                #'Caom_search':'Mast.Caom.Filtered.JwstOps',
-                #'Product_search':'Mast.Caom.Products.JwstOps'
+#                'Caom_search':'Mast.Caom.Filtered.JwstOps',
+#                'Product_search':'Mast.Caom.Products.JwstOps'
                 'Caom_search':'Mast.Caom.Filtered',
                 'Product_search':'Mast.Caom.Products'
                 }
@@ -132,7 +132,7 @@ class query_mast:
         # output columns for the tables. Note that the columns for the individual filetypes
         # are automatically added to the obsTable
         # These are the default values, they can be changed in the config file
-        self.params['outcolumns_productTable']=['proposal_id','obsnum','obsID','parent_obsid','obs_id','dataproduct_type','productFilename','filetype','calib_level','size','description']
+        self.params['outcolumns_productTable']=['proposal_id','obsnum','obsID','parent_obsid','obs_id','sca','dataproduct_type','productFilename','filetype','calib_level','size','description']
         self.params['outcolumns_obsTable']=['proposal_id','obsnum','obsid','obs_id','t_min','t_exptime','date_min']
 
         # The productTable is sorted based on these columns  (can also be set in config file)
@@ -157,6 +157,13 @@ class query_mast:
         else:
             cfgfilename = None
 
+        # default for config file, if available
+        #if 'JWST_QUERY_OUTDIR' in os.environ and os.environ['JWST_QUERY_OUTDIR'] != '':
+        #    defaultoutdir = os.environ['JWST_QUERY_OUTDIR']
+        #else:
+        #    defaultoutdir = None
+
+
         # default for token is $MAST_API_TOKEN
         if 'MAST_API_TOKEN' in os.environ:
             defaulttoken = os.environ['MAST_API_TOKEN']
@@ -167,7 +174,7 @@ class query_mast:
         parser.add_argument('-i', '--instrument', type=str, default=None, choices=['niriss','nircam','nirspec','miri','fgs'], help='Instrument.  (default=%(default)s)')
 
         parser.add_argument('-v','--verbose', default=0, action='count')
-        parser.add_argument('--propID', type=int, default=None, help='Search for data for this proposal ID(=APT #) only.')
+        parser.add_argument('--propID', type=int, nargs="+", default=None, help='Search for data for this proposal ID(=APT #) only. If more than one argument: all following arguments are a list of obsnum\'s')
         parser.add_argument('--guidestars', action='store_true', default=None, help='Don\'t skip guidestars. By default, they are skipped')
         parser.add_argument('-f','--filetypes',  type=str, nargs="+", default=None, help=('List of product filetypes to get, e.g., _uncal.fits or _uncal.jpg. If only letters, then _ and .fits are added, for example uncal gets expanded to _uncal.fits. Typical image filetypes are uncal, rate, rateints, cal (default=%(default)s)'))
         parser.add_argument('--calib_levels',  type=int, nargs="+", default=None, help=('Only select products with the specified calibration levels (calib_level column in productTable) (default=%(default)s)'))
@@ -177,12 +184,16 @@ class query_mast:
         parser.add_argument('--token', type=str, default=defaulttoken, help='MAST API token. You can also set the token in the environment variable \$MAST_API_TOKEN')
 
         parser.add_argument('--outrootdir', default=None, help='output root directory (default=%(default)s)')
-        parser.add_argument('--outsubdir', default=None, help='osubdir added to utput root directory (default=%(default)s)')
+        parser.add_argument('--outsubdir', default=None, help='outsubdir added to output root directory (default=%(default)s)')
         parser.add_argument('--skip_propID2outsubdir', action='store_true', default=None, help='By default, the APT proposal ID is added as a subdir to the output directory. You can skip this with this option (default=%(default)s)')
-        parser.add_argument('--skip_check_if_outfile_exists', action='store_true', default=None,help='Don\'t check if output files exists. This makes it faster for large lists')
 
-        parser.add_argument('-e','--obsid_select', nargs="+", default=[], help='Specify obsid range applied to "obsID" column in the PRODUCT table. If single value, then exact match. If single value has "+" or "-" at the end, then it is a lower and upper limit, respectively. If two values, then range. Examples: 385539+, 385539-, 385539 385600 (default=%(default)s)')
-        parser.add_argument('-l','--obsid_list', nargs="+", default=[], help='Specify list of obsid applied to "obsID" column in the PRODUCT table. examples: 385539 385600 385530 (default=%(default)s)')
+        parser.add_argument('--skip_check_if_outfile_exists', action='store_true', default=None, help='Don\'t check if output files exists. This makes it faster for large lists, but files might be reloaded')        
+        parser.add_argument('--skip_check_filesize', action='store_true', default=None, help='Don\'t check if output files have the correct filesize. This makes it faster for large lists, but files might be corrupted.')        
+
+        parser.add_argument('-e','--obsid_select', nargs="+", default=[], help='Specify obsid range applied to "obsID" and "parent_obsid" columns in the PRODUCT table. If single value, then exact match. If single value has "+" or "-" at the end, then it is a lower and upper limit, respectively. If two values, then range. Examples: 385539+, 385539-, 385539 385600 (default=%(default)s)')
+        parser.add_argument('-l','--obsid_list', nargs="+", default=[], help='Specify list of obsid applied to "obsID" and "parent_obsid" columns in the PRODUCT table. examples: 385539 385600 385530 (default=%(default)s)')
+        parser.add_argument('--obnum_list', nargs="+", default=[], help='Specify list of obsnum (default=%(default)s)')
+        parser.add_argument('--sca', nargs="+", default=None, choices=['a1','a2','a3','a4','a5','along','b1','b2','b3','b4','b5','blong'], help='Specify list of sca\'s to select. a5=along, b5=blong')
 
         time_group = parser.add_argument_group("Time constraints for the observation/product search")
 
@@ -276,8 +287,14 @@ class query_mast:
                     self.params[arg]=None
 
         # propID
+        self.params['obsnums']=None
         if self.params['propID'] is not None:
-            self.params['propID'] = '%05d' % (int(self.params['propID']))
+            print(self.params['propID'])
+            if len(self.params['propID'])>1:
+                self.params['obsnums'] = self.params['propID'][1:]
+            self.params['propID'] = '%05d' % (int(self.params['propID'][0]))
+        print('propID',self.params['propID'])
+        print('obsnums',self.params['obsnums'])
         self.verbose = self.params['verbose']
 
         if self.verbose>2:
@@ -308,7 +325,7 @@ class query_mast:
                      productTable=None,
                      ix_selected_products=None):
 
-        if productTable==None:
+        if productTable is None:
            productTable=self.productTable
 
         if ix_selected_products is None:
@@ -323,7 +340,9 @@ class query_mast:
             if limits[i] is not None: limits[i]=int(limits[i])
 
         ixs = self.productTable.ix_remove_null('obsID',indices=ix_selected_products)
-        ixs_keep = self.productTable.ix_inrange('obsID',limits[0],limits[1],indices=ixs)
+        ixs_keep1 = self.productTable.ix_inrange('obsID',limits[0],limits[1],indices=ixs)
+        ixs_keep2 = self.productTable.ix_inrange('parent_obsid',limits[0],limits[1],indices=ixs)
+        ixs_keep = unique(AorB(ixs_keep1,ixs_keep2))
         print(f'obsid cut {limits[0]} - {limits[1]}: keeping {len(ixs_keep)} from {len(ixs)}')
         return(ixs_keep)
 
@@ -331,7 +350,7 @@ class query_mast:
                      productTable=None,
                      ix_selected_products=None):
 
-        if productTable==None:
+        if productTable is None:
            productTable=self.productTable
 
         if ix_selected_products is None:
@@ -345,7 +364,61 @@ class query_mast:
             obsid = int(obsid)
             ixs2add = self.productTable.ix_equal('obsID',obsid,indices=ix_selected_products)
             ixs_keep.extend(ixs2add)
+            ixs2add = self.productTable.ix_equal('parent_obsid',obsid,indices=ix_selected_products)
+            ixs_keep.extend(ixs2add)
+        ixs_keep = unique(ixs_keep)
         print(f'obsid list cut: keeping {len(ixs_keep)} from {len(ix_selected_products)}')
+        return(ixs_keep)
+
+
+    def select_sca(self, sca_list,
+                   productTable=None, 
+                   ix_selected_products=None):
+
+        if productTable is None:
+           productTable=self.productTable
+           
+        if ix_selected_products is None:
+            ix_selected_products = self.ix_selected_products
+        
+        if sca_list is None or len(sca_list)==0:
+            return(ix_selected_products)
+        
+        if isinstance(sca_list,str):
+            sca_list=[sca_list]
+
+        ixs_keep = []
+        for sca in sca_list:
+            if sca=='a5': sca='along'
+            if sca=='b5': sca='blong'
+            ixs2add = self.productTable.ix_equal('sca',sca,indices=ix_selected_products)
+            ixs_keep.extend(ixs2add)
+        ixs_keep = unique(ixs_keep)
+        print(f'select sca {sca_list}: keeping {len(ixs_keep)} from {len(ix_selected_products)}')
+        return(ixs_keep)
+    
+    def select_obsnums(self, obsnum_list,
+                       productTable=None, 
+                       ix_selected_products=None):
+
+        if productTable is None:
+           productTable=self.productTable
+           
+        if ix_selected_products is None:
+            ix_selected_products = self.ix_selected_products
+        
+        if obsnum_list is None or len(obsnum_list)==0:
+            return(ix_selected_products)
+        
+        if isinstance(obsnum_list,str):
+            obsnum_list=[obsnum_list]
+
+        ixs_keep = []
+        for obsnum in obsnum_list:
+            ixs2add = self.productTable.ix_equal('obsnum',obsnum,indices=ix_selected_products)
+            ixs_keep.extend(ixs2add)
+        ixs_keep = unique(ixs_keep)
+        print(f'select obsnum {obsnum_list}: keeping {len(ixs_keep)} from {len(ix_selected_products)}')
         return(ixs_keep)
 
 
@@ -397,6 +470,7 @@ class query_mast:
             mjd_max = Time.now().mjd+0.1
 
         return(mjd_min, mjd_max)
+    
     def observation_query(self, propID=None, instrument=None, mjd_min=None, mjd_max=None, token=None):
         '''
         Perform query for observations matching JWST instrument and program ID
@@ -423,8 +497,11 @@ class query_mast:
         if propID is not None:
             params["filters"].append({"paramName":"proposal_id","values":[propID]})
 
-        if self.verbose:
+        if self.verbose: 
             print('\n#### Querying Obstable....')
+        if self.verbose>1:
+            print('query params:',params)
+        
         if token is not None:
             self.obsTable.t = self.JwstObs.service_request(service, params,mast_token=token).to_pandas()
         else:
@@ -439,13 +516,13 @@ class query_mast:
         # Find the obsnum # from the filename if possible.
         ixs = self.obsTable.getindices()
         obsnumsearch = re.compile('^jw\d{5}(\d{3})\d{3}\_')
-        self.obsTable.t['obsnum']=None
+        self.obsTable.t['obsnum']=pd.NA
         for ix in ixs:
             m = obsnumsearch.search(self.obsTable.t.loc[ix,'obs_id'])
             if m is not None:
                 self.obsTable.t.loc[ix,'obsnum']=int(m.groups()[0])
             else:
-                self.obsTable.t.loc[ix,'obsnum']=None
+                self.obsTable.t.loc[ix,'obsnum']=pd.NA
 
         self.obsTable.mjd2dateobs('t_min','date_min')
 
@@ -456,6 +533,10 @@ class query_mast:
             self.obsTable.t['proposal_id']=self.obsTable.t['proposal_id'].astype('int')
         if 'obsid' in self.obsTable.t.columns:
             self.obsTable.t['obsid']=self.obsTable.t['obsid'].astype('int')
+
+        self.obsTable.t.style.set_properties(subset=["obs_id"], **{'text-align': 'left'})
+        #self.obsTable.default_formatters['obs_id']='{:<}'.format
+        
 
         if self.verbose>1: print('Obstable columns:',self.obsTable.t.columns)
 
@@ -476,10 +557,10 @@ class query_mast:
         None.
 
         """
-        if obsTable==None:
+        if obsTable is None:
             obsTable=self.obsTable
 
-        if productTable==None:
+        if productTable is None:
            productTable=self.productTable
 
         self.obsTable.t['obsnum']=pd.Series(self.obsTable.t['obsnum'],dtype=pd.Int32Dtype())
@@ -571,17 +652,18 @@ class query_mast:
         # fill the suffix column with the suffix of the form _bla1.bla2, e.g. _uncal.fits
         # This will later be used to figure out
         self.productTable.t['filetype'] = self.productTable.t['productFilename'].str.extract(r'(\_[a-zA-Z0-9]+\.[a-zA-Z0-9]+)$')
+        self.productTable.t['sca'] = self.productTable.t['obs_id'].str.extract(r'_nrc([a-zA-Z0-9]+$)')
 
         # Find the obsnum # from the filename if possible.
         ixs = self.productTable.getindices()
         obsnumsearch = re.compile('^jw\d{5}(\d{3})\d{3}\_')
-        self.productTable.t['obsnum']=None
+        self.productTable.t['obsnum']=pd.NA
         for ix in ixs:
             m = obsnumsearch.search(self.productTable.t.loc[ix,'obs_id'])
             if m is not None:
                 self.productTable.t.loc[ix,'obsnum']=int(m.groups()[0])
             else:
-                self.productTable.t.loc[ix,'obsnum']=None
+                self.productTable.t.loc[ix,'obsnum']=pd.NA
 
         # make proposal_id integer
         self.productTable.t['proposal_id']=self.productTable.t['proposal_id'].astype('int')
@@ -604,26 +686,30 @@ class query_mast:
         '''
         Filter the list of products based on the filetype (or better suffix)
         '''
-        if productTable==None:
+        if productTable is None:
            productTable=self.productTable
-
-        if filetypes==None:
+        
+        if filetypes is None:
             filetypes=self.params['filetypes']
 
-        if calib_levels==None:
+        if calib_levels is None:
             calib_levels=self.params['calib_levels']
 
         if self.verbose:
             print('\n#### Selecting products....')
 
         # if necessary, add leading '_' and suffix '.fits'
-        for i in range(len(filetypes)):
-            if re.search('^_',filetypes[i]) is None:
-                filetypes[i] = '_'+filetypes[i]
-            if re.search('\.',filetypes[i]) is None:
-                filetypes[i] += '.fits'
-
-        print('allowed filetype list:',filetypes)
+        if filetypes is not None:
+            for i in range(len(filetypes)):
+                if filetypes[i] in ['fits','jpg']:
+                    filetypes[i]+='$'
+                    continue
+                if re.search('^_',filetypes[i]) is None:
+                    filetypes[i] = '_'+filetypes[i]
+                if re.search('\.',filetypes[i]) is None:
+                    filetypes[i] += '.fits'
+        
+            print('allowed filetype list:',filetypes)
 
         ix_products = self.productTable.getindices()
         # remove guide stars if wanted...
@@ -637,7 +723,6 @@ class query_mast:
 
         if calib_levels is not None:
             ix_calib_level = []
-            print('VVVVVVVVVVv',calib_levels)
             for calib_level in calib_levels:
                 ixs = self.productTable.ix_equal('calib_level',calib_level,indices=ix_products)
                 if self.verbose>1:
@@ -649,33 +734,62 @@ class query_mast:
 
         # Loop trough the filetypes and get all entries from ix_products list
         self.ix_selected_products = []
-        for filetype in filetypes:
-
-            # make sure the '.' in the regular expression is literal, and also add '$' to the end
-            regex=re.sub('\.','\.',filetype)+'$'
-
-            # get the indices for matching filetype ...
-            ix_matching_filetype = self.productTable.ix_matchregex('filetype',regex,indices=ix_products)
-            # ... and add them to the list of good indices
-            self.ix_selected_products.extend(ix_matching_filetype)
-
-            if self.verbose>1:
-                print('%d products with filetype regex matching %s' % (len(ix_matching_filetype),regex))
-
+        if filetypes is not None:
+            for filetype in filetypes:
+                
+                # make sure the '.' in the regular expression is literal, and also add '$' to the end
+                regex=re.sub('\.','\.',filetype)+'$'
+                
+                # get the indices for matching filetype ...
+                ix_matching_filetype = self.productTable.ix_matchregex('filetype',regex,indices=ix_products)
+                # ... and add them to the list of good indices
+                self.ix_selected_products.extend(ix_matching_filetype)
+            
+                if self.verbose>1:
+                    print('%d products with filetype regex matching %s' % (len(ix_matching_filetype),regex))
+            if self.verbose:
+                print('%d products with correct filetypes left' % (len(self.ix_selected_products)))
+        else:
+            self.ix_selected_products = ix_products
+        
+        # get the list of valid filetypes that exist
+        self.params['filetypes'] = unique(self.productTable.t.loc[self.ix_selected_products,'filetype'])
+        
         self.ix_selected_products = self.productTable.ix_sort_by_cols(self.params['sortcols_productTable'],indices=self.ix_selected_products)
-
-
-        if self.verbose:
-            print('%d products with correct filetypes left' % (len(self.ix_selected_products)))
+        
 
         return(self.ix_selected_products)
+    
+    def update_obstable_indices(self, ixs_prod, ix_obs_sorted=None, obsTable=None, productTable=None):
+        if obsTable is None:
+            obsTable=self.obsTable
 
-    def mk_outfilename(self, productTable, ix,
+        if productTable is None:
+           productTable=self.productTable
+           
+        if ix_obs_sorted is None:
+            ix_obs_sorted = self.ix_obs_sorted
+
+        # get all parent_obsids of the selected products
+        obsids = unique(productTable.t.loc[ixs_prod,'parent_obsid'])
+        
+        # get all keys in observation table that are associated with these obsids
+        new_ix_obs_sorted = []
+        for obsid in obsids:
+            new_ix_obs_sorted.extend(self.obsTable.ix_equal('obsid',obsid,indices=ix_obs_sorted))
+
+        # Keep the order from ix_obs_sorted!
+        new_ix_obs_sorted = AandB(ix_obs_sorted,new_ix_obs_sorted)
+        
+        return(new_ix_obs_sorted)
+    
+    def mk_outfilename(self, productTable, ix, 
                        outdir=None,
                        skip_propID2outsubdir=False,
                        obsnum2outsubdir=False,
                        #info2filename=False,
-                       skip_check_if_outfile_exists=False):
+                       skip_check_if_outfile_exists=False,
+                       skip_check_filesize=False):
 
 
         if outdir is None:
@@ -703,8 +817,19 @@ class query_mast:
 
         if not skip_check_if_outfile_exists:
             if os.path.exists(fullfilename):
-                productTable.t.loc[ix,'dl_code'] = 2
-                productTable.t.loc[ix,'dl_str'] = 'exists'
+                if not skip_check_filesize:
+#                    print('VVV',productTable.t.loc[ix,'outfilename'],productTable.t.loc[ix,'size'],os.path.getsize(productTable.t.loc[ix,'outfilename']))
+                    outfile_filesize = os.path.getsize(productTable.t.loc[ix,'outfilename'])
+                    if outfile_filesize != int(productTable.t.loc[ix,'size']):
+                        productTable.t.loc[ix,'dl_code'] = 4
+                        productTable.t.loc[ix,'dl_str'] = 'ERRfilesize'
+                    else:
+                        productTable.t.loc[ix,'dl_code'] = 2
+                        productTable.t.loc[ix,'dl_str'] = 'exists'
+                else:
+                    productTable.t.loc[ix,'dl_code'] = 2
+                    productTable.t.loc[ix,'dl_str'] = 'exists'
+
             else:
                 productTable.t.loc[ix,'dl_code'] = 0
                 productTable.t.loc[ix,'dl_str'] = None
@@ -733,9 +858,10 @@ class query_mast:
                         outdir=None,
                         skip_propID2outsubdir=False,
 #                        info2filename=False,
-                        skip_check_if_outfile_exists=False):
-
-        if productTable==None:
+                        skip_check_if_outfile_exists=False,
+                        skip_check_filesize=False):
+        
+        if productTable is None:
            productTable=self.productTable
 
         if ix_selected_products is None:
@@ -744,7 +870,7 @@ class query_mast:
 
 
         productTable.t.loc[ix_selected_products,'outfilename'] = None
-        productTable.t.loc[ix_selected_products,'dl_code'] = np.nan
+        productTable.t.loc[ix_selected_products,'dl_code'] = pd.NA
         productTable.t.loc[ix_selected_products,'dl_str'] = None
         productTable.t['dl_code'] = productTable.t['dl_code'].astype(pd.Int32Dtype())
 #        if 'outfilename' not in self.imoutcols: self.imoutcols.append('outfilename')
@@ -754,8 +880,9 @@ class query_mast:
             self.mk_outfilename(productTable,
                                 ix,
                                 outdir=outdir,
-                                skip_propID2outsubdir=skip_propID2outsubdir,
-                                skip_check_if_outfile_exists=skip_check_if_outfile_exists)
+                                skip_propID2outsubdir=skip_propID2outsubdir, 
+                                skip_check_if_outfile_exists=skip_check_if_outfile_exists,
+                                skip_check_filesize=skip_check_filesize)
         return(self.ix_selected_products)
 
 
@@ -777,16 +904,16 @@ class query_mast:
         None.
 
         """
-        if obsTable==None:
+        if obsTable is None:
             obsTable=self.obsTable
 
-        if productTable==None:
+        if productTable is None:
            productTable=self.productTable
 
         if ix_selected_products is None:
             ix_selected_products = self.ix_selected_products
-
-        if filetypes==None:
+       
+        if filetypes is None:
             filetypes=self.params['filetypes']
         # add the filetypes to the output columns of obsTable
         for filetype in filetypes:
@@ -814,11 +941,15 @@ class query_mast:
 
         return(0)
 
-    def mk_summary_tables(self, obsTable=None, filetypes=None):
-        if obsTable==None:
+    def mk_summary_tables(self, obsTable=None, ix_obs_sorted=None, filetypes=None):
+        if obsTable is None:
             obsTable=self.obsTable
+            
+        if ix_obs_sorted is None:
+            ix_obs_sorted = self.ix_obs_sorted
 
-        if filetypes==None:
+
+        if filetypes is None:
             filetypes=self.params['filetypes']
 
         # Add the filetypes to the summary table column
@@ -831,9 +962,9 @@ class query_mast:
         self.summary.t['proposal_id']=pd.Series(dtype=pd.Int64Dtype())
 
         #Loop through each propID
-        propIDs = unique(obsTable.t['proposal_id'])
+        propIDs = unique(obsTable.t.loc[ix_obs_sorted,'proposal_id'])
         for propID in propIDs:
-            ixs_propID =  obsTable.ix_equal('proposal_id',propID)
+            ixs_propID =  obsTable.ix_equal('proposal_id',propID,indices=ix_obs_sorted)
 
             ixs_propID_notnull = obsTable.ix_remove_null('obsnum', indices=ixs_propID)
             obsnums = unique(obsTable.t.loc[ixs_propID_notnull,'obsnum'])
@@ -888,7 +1019,7 @@ class query_mast:
         mjd_min, mjd_max = self.get_mjd_limits()
 
         # get the observations: stored in self.obsTable
-        self.observation_query(self.params['propID'], mjd_min = mjd_min, mjd_max = mjd_max)
+        self.observation_query(propID=self.params['propID'], mjd_min = mjd_min, mjd_max = mjd_max)
 
         if len(self.obsTable.t)==0:
             print('\n################################\nNO OBSERVATIONS FOUND! exiting....\n################################')
@@ -911,15 +1042,24 @@ class query_mast:
         # uses self.filetypes for filtering, which is set by optional parameters.
         # the selected products indices are put into self.ix_selected_products
         self.product_filter()
+        
+        # get selected obsnums if specified
+        self.ix_selected_products = self.select_obsnums(self.params['obsnums'])
 
         # make some obsid cuts!
         self.ix_selected_products = self.obsid_select(self.params['obsid_select'])
         self.ix_selected_products = self.obsid_list(self.params['obsid_list'])
-
-
+        
+        # get selected SCAs if specified
+        self.ix_selected_products = self.select_sca(self.params['sca'])
+                
+        # only keep entries in the obstable that are parent_obsid in product table
+        self.ix_obs_sorted = self.update_obstable_indices(self.ix_selected_products)
+        
         # definte the output filenames, and check if they exist.
         self.mk_outfilenames(skip_propID2outsubdir=self.params['skip_propID2outsubdir'],
-                             skip_check_if_outfile_exists=self.params['skip_check_if_outfile_exists'])
+                             skip_check_if_outfile_exists=self.params['skip_check_if_outfile_exists'],
+                             skip_check_filesize=self.params['skip_check_filesize'])
 
         # update obsTable with selected products: count the different filetypes, and also update the obsnum if None in obsTable
         self.update_obsTable_with_selectedProducts()
