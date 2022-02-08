@@ -1063,7 +1063,7 @@ class query_mast:
             print(f'writing propID={propID} html to {htmlname}')
             productTable.write(filename=htmlname, indices=ixs_uncal, columns=outcols, htmlflag=True, escape=False)
 
-    def mk_all_tables(self, filetypes=None, showtables=True, makewebpages=False):
+    def mk_all_tables(self, filetypes=None, showtables=True):
 
         if filetypes is not None:
             self.params['filetypes'] = filetypes
@@ -1137,9 +1137,6 @@ class query_mast:
             self.obsTable.write(filename=self.params['savetables']+'.obs.txt',columns=self.params['outcolumns_obsTable'],indices=self.ix_obs_sorted,verbose=2)
             self.summary.write(filename=self.params['savetables']+'.summary.txt',indices=self.ix_summary_sorted,verbose=2)
 
-        if makewebpages:
-            self.mk_webpages()
-
         return(0)
 
 if __name__ == '__main__':
@@ -1161,8 +1158,11 @@ if __name__ == '__main__':
     if query.verbose: print(f'Outdir: {query.outdir}')
 
     # make the tables
-    query.mk_all_tables(makewebpages=args.makewebpages)
+    query.mk_all_tables()
 
+    # make the webpages
+    if args.makewebpages:
+        query.mk_webpages()
 
 
 
