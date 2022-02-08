@@ -216,7 +216,7 @@ if __name__ == '__main__':
     if download.verbose: print(f'Outdir: {download.outdir}')
         
     # make the tables, but don't show them yet, since the output files need to be updated first  
-    download.mk_all_tables(showtables=True)
+    download.mk_all_tables(showtables=True,makewebpages=args.makewebpages)
     
     if not args.skipdownload and len(download.obsTable.t)>0:
         download.download_products()

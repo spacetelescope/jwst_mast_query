@@ -223,12 +223,13 @@ class query_mast:
 #        time_group.add_argument('-d', '--date_limits', default=None, type=str, nargs=2, help='specify the date limits (ISOT format). overrides lookback time and mjd* optional arguments.')
         time_group.add_argument('-d','--date_select', nargs="+", default=[], help='Specify date range (MJD or isot format) applied to "dateobs_center" column. If single value, then exact match. If single value has "+" or "-" at the end, then it is a lower and upper limit, respectively. Examples: 58400+, 58400-,2020-11-23+, 2020-11-23 2020-11-25  (default=%(default)s)')
 
-        time_group.add_argument('--lre3', action='store_true', default=None, help='Use the LRE-3 date limits. Overrides lookback and mjd* options.')
-        time_group.add_argument('--lre4', action='store_true', default=None, help='Use the LRE-4 date limits. Overrides lookback and mjd* options.')
-        time_group.add_argument('--lre5', action='store_true', default=None, help='Use the LRE-5 date limits. Overrides lookback and mjd* options.')
-        time_group.add_argument('--lre6', action='store_true', default=None, help='Use the LRE-6 date limits. Overrides lookback and mjd* options.')
+#        time_group.add_argument('--lre3', action='store_true', default=None, help='Use the LRE-3 date limits. Overrides lookback and mjd* options.')
+#        time_group.add_argument('--lre4', action='store_true', default=None, help='Use the LRE-4 date limits. Overrides lookback and mjd* options.')
+#        time_group.add_argument('--lre5', action='store_true', default=None, help='Use the LRE-5 date limits. Overrides lookback and mjd* options.')
+#        time_group.add_argument('--lre6', action='store_true', default=None, help='Use the LRE-6 date limits. Overrides lookback and mjd* options.')
 
         parser.add_argument('-s', '--savetables', type=str, default=None, help='save the tables (selected products, obsTable, summary with suffix selprod.txt, obs.txt, summary.txt, respectively) with the specified string as basename (default=%(default)s)')
+        parser.add_argument('--makewebpages', action='store_true', default=False, help='Make webpages for the products for each propID using the downloaded *jpg files')        
 
 
         return(parser)
@@ -308,7 +309,6 @@ class query_mast:
         # propID
         self.params['obsnums']=None
         if self.params['propID'] is not None:
-            print(self.params['propID'])
             if len(self.params['propID'])>1:
                 self.params['obsnums'] = self.params['propID'][1:]
             self.params['propID'] = '%05d' % (int(self.params['propID'][0]))
@@ -441,14 +441,10 @@ class query_mast:
         return(ixs_keep)
 
 
-    def get_mjd_limits(self, lookbacktime=None, date_select=None, lre3=False, lre4=False, lre5=False, lre6=False):
+    def get_mjd_limits(self, lookbacktime=None, date_select=None):
         if lookbacktime is None: lookbacktime = self.params['lookbacktime']
 
         if date_select is None: date_select = self.params['date_select']
-        if not lre3: lre3 = self.params['lre3']
-        if not lre4: lre4 = self.params['lre4']
-        if not lre5: lre5 = self.params['lre5']
-        if not lre6: lre6 = self.params['lre6']
 
         mjd_min = mjd_max = None
         # parse trailing '+' and '-', and get limits
@@ -463,22 +459,6 @@ class query_mast:
                         limits[i]= Time(limits[i], format='isot').to_value('mjd')
             mjd_min = limits[0]
             mjd_max = limits[1]
-        elif lre3:
-            if self.verbose: print('setting mjd limits to LRE-3!')
-            mjd_min = Time('2021-05-19', format='iso').mjd
-            mjd_max = mjd_min+7
-        elif lre4:
-            if self.verbose: print('setting mjd limits to LRE-4!')
-            mjd_min = Time('2021-06-14', format='iso').mjd
-            mjd_max = mjd_min+7
-        elif lre5:
-            if self.verbose: print('setting mjd limits to LRE-5!')
-            mjd_min = Time('2021-08-08', format='iso').mjd
-            mjd_max = mjd_min+7
-        elif lre6:
-            if self.verbose: print('setting mjd limits to LRE-6!')
-            mjd_min = Time('2021-10-17', format='iso').mjd
-            mjd_max = mjd_min+10
         else:
             if (mjd_min is None):
                 if self.params['lookbacktime']>0.0:
@@ -1083,7 +1063,7 @@ class query_mast:
             print(f'writing propID={propID} html to {htmlname}')
             productTable.write(filename=htmlname, indices=ixs_uncal, columns=outcols, htmlflag=True, escape=False)
 
-    def mk_all_tables(self, filetypes=None, showtables=True, skip_makewebpages=False):
+    def mk_all_tables(self, filetypes=None, showtables=True, makewebpages=False):
 
         if filetypes is not None:
             self.params['filetypes'] = filetypes
@@ -1157,7 +1137,7 @@ class query_mast:
             self.obsTable.write(filename=self.params['savetables']+'.obs.txt',columns=self.params['outcolumns_obsTable'],indices=self.ix_obs_sorted,verbose=2)
             self.summary.write(filename=self.params['savetables']+'.summary.txt',indices=self.ix_summary_sorted,verbose=2)
 
-        if not skip_makewebpages:
+        if makewebpages:
             self.mk_webpages()
 
         return(0)
@@ -1181,7 +1161,7 @@ if __name__ == '__main__':
     if query.verbose: print(f'Outdir: {query.outdir}')
 
     # make the tables
-    query.mk_all_tables()
+    query.mk_all_tables(makewebpages=args.makewebpages)
 
 
 
