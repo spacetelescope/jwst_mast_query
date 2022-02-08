@@ -80,12 +80,14 @@ setup(
     install_requires=[
         'astroquery>=0.4.2',
         'astropy',
+        'ipython',
         'numpy',
         'pandas',
         'pyyaml',
         'scipy',
         'argparse'
     ],
+    scripts=['jwst_mast_query/jwst_query.py', 'jwst_mast_query/jwst_download.py'],
     include_package_data=True,
     extras_require={
         'docs': DOCS_REQUIRE,
