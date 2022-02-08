@@ -223,7 +223,10 @@ if __name__ == '__main__':
         print('\n######################\n### Downloaded Selected Products:\n######################')
         download.productTable.write(indices=download.ix_selected_products,columns=download.params['outcolumns_productTable'])
         
-    
+    # make the webpages
+    if args.makewebpages:
+        download.mk_webpages()
+
 
         
 
