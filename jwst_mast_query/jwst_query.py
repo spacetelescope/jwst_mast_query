@@ -12,7 +12,7 @@ import pandas as pd
 #import astropy.io.fits as fits
 #from astropy.nddata import bitmask
 import astroquery
-import argparse,os,sys,re,types
+import argparse,os,sys,re,types,copy
 import yaml
 
 # pdastroclass is wrapper around pandas.
@@ -58,6 +58,25 @@ def getlimits(lims):
         return([lims[0],lims[1]])
     else:
         raise RuntimeError(f'limits can have only 2 entries, more given! {lims}')
+
+def addlink2string(s,link):
+    return('<a href="%s">%s</a>' % (link,s))
+
+def imagestring4web(imagename, width=None, height=None):
+    imstring = '<img src="%s"' % os.path.basename(imagename)
+    if height != None:
+        imstring += f' height={height}'
+        #if isinstance(height,int): height = str(height)
+        #imstring += 'height=%s' % height
+    if width != None:
+        imstring += f' width={width}'
+        #if isinstance(width,int): width = str(width)
+        #imstring += 'width=%s' % width
+    imstring +='>'
+    return(imstring)
+
+def image_thumbnail(imagename, width=None, height=None):
+    return(addlink2string(imagestring4web(imagename,width=width,height=height),imagename))
 
 
 class query_mast:
@@ -786,7 +805,7 @@ class query_mast:
     def mk_outfilename(self, productTable, ix, 
                        outdir=None,
                        skip_propID2outsubdir=False,
-                       obsnum2outsubdir=False,
+                       #obsnum2outsubdir=False,
                        #info2filename=False,
                        skip_check_if_outfile_exists=False,
                        skip_check_filesize=False):
@@ -803,11 +822,11 @@ class query_mast:
             #outdir += f'/{productTable.t.loc[ix,"proposal_id"]}'
             outdir += '/{:05d}'.format(productTable.t.loc[ix,"proposal_id"])
 
-        if obsnum2outsubdir:
-            if productTable.t.loc[ix,"obsnum"] is pd.NA:
-                outdir += '/NA'
-            else:
-                outdir += f'/{productTable.t.loc[ix,"obsnum"]}'
+        #if obsnum2outsubdir:
+        #    if productTable.t.loc[ix,"obsnum"] is pd.NA:
+        #        outdir += '/NA'
+        #    else:
+        #        outdir += f'/{productTable.t.loc[ix,"obsnum"]}'
 
 
         outfilename = productTable.t.loc[ix,'productFilename']
@@ -1009,8 +1028,62 @@ class query_mast:
         self.ix_summary_sorted = self.summary.ix_sort_by_cols(self.params['sortcols_summaryTable'])
 
         return(0)
+    
+    def mk_webpages(self, productTable=None, ix_selected_products=None, filetypes=None, width=None, height=None):
+        if productTable is None:
+            # make a deep copy so that the thumbnail columns are not copied into the self.productTable
+            productTable= copy.deepcopy(self.productTable)
 
-    def mk_all_tables(self, filetypes=None, showtables=True):
+        if ix_selected_products is None:
+            ix_selected_products = self.ix_selected_products
+       
+        if filetypes is None:
+            filetypes=self.params['filetypes']
+            
+        if width is None:
+            width=self.params['webpage_thumbnail_width'] 
+
+        if height is None:
+            height=self.params['webpage_thumbnail_height'] 
+            
+        propIDs = unique(productTable.t.loc[ix_selected_products,'proposal_id'])
+        for propID in propIDs:
+            propID = int(propID)
+            htmlname = f'{self.outdir}/{propID:05d}/index.html'
+            
+            # get all indices for uncal.jpg
+            ixs_propID = productTable.ix_equal('proposal_id',propID,indices=ix_selected_products)
+            ixs_uncal  = productTable.ix_equal('filetype','_uncal.jpg',indices=ixs_propID)
+            ixs_uncal =  productTable.ix_sort_by_cols(self.params['sortcols_productTable'],indices=ixs_uncal)
+
+            # figure out the jpg suffixes, and define the column names
+            suffixes = self.params['webpage_level12_jpgs']
+            filetypes_propID = unique(productTable.t.loc[ixs_propID,'filetype'])
+            suffixes = AandB(suffixes,filetypes_propID,keeporder=True)
+            figcols=[]
+            for suffix in suffixes:
+                figcols.append(re.sub('_|\.jpg$','',suffix))
+            
+            #make the thumbnails
+            for ix in ixs_uncal:
+                for suffix,figcol in zip(suffixes,figcols):
+                    jpgname = f"{productTable.t.loc[ix,'obs_id']}{suffix}"
+                    # make a thumbnail that links to the full size image
+                    productTable.t.loc[ix,figcol]=image_thumbnail(jpgname,width=width,height=height)
+                    #productTable.t.loc[ix,figcol]=addlink2string(imagestring4web(jpgname,width=None,height=p),jpgname)
+
+            # get the outcols
+            outcols=['proposal_id','obsnum','obsID','parent_obsid','sca','size']
+            # make sure the columns exist
+            outcols=AandB(outcols,productTable.t.columns,keeporder=True)
+            outcols.extend(figcols)
+            outcols.extend(['obs_id','outfilename'])
+            
+            # write it to index.html
+            print(f'writing propID={propID} html to {htmlname}')
+            productTable.write(filename=htmlname, indices=ixs_uncal, columns=outcols, htmlflag=True, escape=False)
+
+    def mk_all_tables(self, filetypes=None, showtables=True, skip_makewebpages=False):
 
         if filetypes is not None:
             self.params['filetypes'] = filetypes
@@ -1083,6 +1156,9 @@ class query_mast:
             self.productTable.write(filename=self.params['savetables']+'.selprod.txt',indices=self.ix_selected_products,columns=self.params['outcolumns_productTable'],verbose=2)
             self.obsTable.write(filename=self.params['savetables']+'.obs.txt',columns=self.params['outcolumns_obsTable'],indices=self.ix_obs_sorted,verbose=2)
             self.summary.write(filename=self.params['savetables']+'.summary.txt',indices=self.ix_summary_sorted,verbose=2)
+
+        if not skip_makewebpages:
+            self.mk_webpages()
 
         return(0)
 
