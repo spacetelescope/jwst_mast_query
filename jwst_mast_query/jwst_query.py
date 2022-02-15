@@ -299,7 +299,7 @@ class query_mast:
                 print("Warning: no token given, could not login, only public requests possible")
                 return(1)
         else:
-            self.JwstObs.login(token=token, store_token=True)
+            self.JwstObs.login(token=token, store_token=False)
         return(0)
 
     def obsid_select(self,obsid_select,
