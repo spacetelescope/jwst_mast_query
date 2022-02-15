@@ -62,6 +62,25 @@ def AnotB(A,B,keeporder=False):
 def not_AandB(A,B):
     return(np.setxor1d(A,B))
 
+def order_A_like_B(A,B):
+    """
+    Parameters
+    ----------
+    A : list-like object
+    B : list-like object
+
+    Returns
+    -------
+    returns A but ordered like the following:
+        all entries that are also in B come first, in the order of B
+        all entries that are not in B come next, in the original order
+
+    """
+    tmp = AandB(A,B,keeporder=True)
+    notB = AnotB(A,tmp,keeporder=True)
+    tmp.extend(notB)
+    return(tmp)
+
 def unique(A):
     unique = []
     for a in A:
@@ -179,7 +198,7 @@ class pdastroclass:
         return(0)
 
     def write(self,filename=None,indices=None,columns=None,formatters=None,raiseError=True,overwrite=True,verbose=False, 
-              index=False, makepathFlag=True,convert_dtypes=False,hexcols=None,**kwargs):
+              index=False, makepathFlag=True,convert_dtypes=False,hexcols=None, htmlflag=False, **kwargs):
 
         # make sure indices are converted into a valid list
         indices=self.getindices(indices)
@@ -252,7 +271,10 @@ class pdastroclass:
             if filename is None:
                 print(self.t.loc[indices].to_string(index=index, columns=columns, formatters=formatters, **kwargs))
             else:
-                self.t.loc[indices].to_string(filename, index=index, columns=columns, formatters=formatters, **kwargs)
+                if not htmlflag:
+                    self.t.loc[indices].to_string(filename, index=index, columns=columns, formatters=formatters, **kwargs)
+                else:
+                    self.t.loc[indices].to_html(filename, index=index, columns=columns, formatters=formatters, **kwargs)
 
         if not (filename is None):
             # some extra error checking...
