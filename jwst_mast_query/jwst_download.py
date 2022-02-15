@@ -144,14 +144,24 @@ class download_mast(query_mast):
 
         ixs_exist = productTable.ix_equal('dl_code',2,indices = ix_selected_products)
 
+        skip_string = f'### None of these files are currently present in the output directory. Downloading all.'
         if not self.params['clobber']:
             ixs_download = AnotB(ix_selected_products,ixs_exist)
-            print(f'\n###############################\n### Downloading {len(ixs_download)} files')
-            if len(ixs_exist)>0: print(f'### skipping {len(ixs_exist)} since they already exist')
+            #print(f'\n###############################\n### Downloading {len(ixs_download)} files')
+            if len(ixs_exist)>0:
+                skip_string = f'### skipping {len(ixs_exist)} files since they already exist'
         else:
             ixs_download = ix_selected_products
+            #print(f'\n###############################\n### Downloading {len(ixs_download)} files')
+            if len(ixs_exist)>0:
+                skip_string = f'### clobbering {len(ixs_exist)} files that already exist'
+
+        if len(ixs_download) == 0:
+            print(f'###############################\n### No Files Matching Query. Nothing to download.')
+            sys.exit(0)
+        else:
             print(f'\n###############################\n### Downloading {len(ixs_download)} files')
-            if len(ixs_exist)>0: print(f'### clobbering {len(ixs_exist)} that already exist')
+            print(skip_string)
 
         print(f'Outdir: {self.outdir}/<proposal_id> where <proposal_id> is the value in the proposal_id column')
 

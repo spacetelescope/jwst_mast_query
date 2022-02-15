@@ -41,6 +41,15 @@ if astroquery.__version__<'0.4.2':
 # $JWST_QUERY_CFGFILE: the config file is optional. It an be specified with
 # $JWST_QUERY_CFGFILE or with --configfile
 
+# List of allowed sca (detector) names
+ALL_SCAS = ['a1', 'a2', 'a3', 'a4', 'a5', 'along',
+            'b1', 'b2', 'b3', 'b4', 'b5', 'blong',
+            'guider1','guider2',
+            'nrs1','nrs2',
+            'mirimage', 'mirifulong', 'mirifushort',
+            'nis']
+
+
 def getlimits(lims):
     if lims is None or len(lims)==0:
         return(None)
@@ -211,7 +220,7 @@ class query_mast:
         parser.add_argument('-e','--obsid_select', nargs="+", default=[], help='Specify obsid range applied to "obsID" and "parent_obsid" columns in the PRODUCT table. If single value, then exact match. If single value has "+" or "-" at the end, then it is a lower and upper limit, respectively. If two values, then range. Examples: 385539+, 385539-, 385539 385600 (default=%(default)s)')
         parser.add_argument('-l','--obsid_list', nargs="+", default=[], help='Specify list of obsid applied to "obsID" and "parent_obsid" columns in the PRODUCT table. examples: 385539 385600 385530 (default=%(default)s)')
         parser.add_argument('--obnum_list', nargs="+", default=[], help='Specify list of obsnum (default=%(default)s)')
-        parser.add_argument('--sca', nargs="+", default=None, choices=['a1','a2','a3','a4','a5','along','b1','b2','b3','b4','b5','blong'], help='Specify list of sca\'s to select. a5=along, b5=blong')
+        parser.add_argument('--sca', nargs="+", default=None, choices=['a1','a2','a3','a4','a5','along','b1','b2','b3','b4','b5','blong','guider1','guider2','nrs1','nrs2','mirimage','mirifulong','mirifushort','nis'], help='Specify list of sca\'s to select. a5=along, b5=blong')
 
         time_group = parser.add_argument_group("Time constraints for the observation/product search")
 
@@ -647,10 +656,16 @@ class query_mast:
             if self.verbose:
                 print('Removing %d guide star products from a total of %d products, %d left' % (len(ixs_gs),len(ixs_products),len(ixs_keep_products)))
 
-        # fill the suffix column with the suffix of the form _bla1.bla2, e.g. _uncal.fits
+        # Fill the suffix column with the suffix of the form _bla1.bla2, e.g. _uncal.fits
         # This will later be used to figure out
         self.productTable.t['filetype'] = self.productTable.t['productFilename'].str.extract(r'(\_[a-zA-Z0-9]+\.[a-zA-Z0-9]+)$')
-        self.productTable.t['sca'] = self.productTable.t['obs_id'].str.extract(r'_nrc([a-zA-Z0-9]+$)')
+
+        scas = list(np.repeat(np.nan, len(self.productTable.t['obs_id'])))
+        for i, oid in enumerate(self.productTable.t['obs_id']):
+            match = [word for word in ALL_SCAS if word in oid]
+            if len(match) > 0:
+                scas[i] = match[0]
+        self.productTable.t['sca'] = scas
 
         # Find the obsnum # from the filename if possible.
         ixs = self.productTable.getindices()
