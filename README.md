@@ -73,7 +73,7 @@ The config file is a convenient way to set and keep track of parameter values. T
 |guidestars: False                   | If guidestars is set to True, guidestar products are also included. Note: there are a **lot** of guide star products. We recommend you set to True only if really needed!|
 |lookbacktime: 1.0                   | Lookback time in days. The script will query MAST over a time from the lookback time to the present moment. Note that all other time parameters (date_select, etc) override the lookback time.|
 |mastcolumns_obsTable: ['proposal_id', 'dataURL', 'obs_id', 't_min','t_exptime'] | Core columns returned from MAST to the obsTable|
-|outcolumns_productTable             | List of columns to be shown in product table, e.g., ['proposal_id', 'obsnum', 'obsID', 'parent_obsid', 'obs_id', 'dataproduct_type', 'productFilename', 'filetype', 'calib_level', 'size', 'outfilename', 'dl_code', 'dl_str']
+|outcolumns_productTable             | List of columns to be shown in product table, e.g., ['proposal_id', 'obsnum', 'obsID', 'parent_obsid', 'obs_id', 'dataproduct_type', 'productFilename', 'filetype', 'calib_level', 'size', 'outfilename', 'dl_code', 'dl_str']|
 |outcolumns_obsTable: ['proposal_id', 'obsnum', 'obsid', 'obs_id', 't_min', 't_exptime', 'date_min'] | Output columns for the obsTable. |
 |sortcols_productTable: ['calib_level','filetype','obsID'] | The productTable is sorted based on these columns. The default sorts the table based on calibration level.|
 |sortcols_obsTable: ['date_min','proposal_id','obsnum'] | The obsTable is sorted based on these columns. The defaults sort the table in the order the observations were observed |
