@@ -15,7 +15,7 @@ import os,sys,shutil,re
 from astropy.utils.data import download_file
 
 from jwst_query import query_mast
-from pdastro import makepath4file,AnotB
+from jwst_mast_query.pdastro import makepath4file,AnotB
 
 
 # MAST API documentation:
@@ -60,7 +60,7 @@ class download_mast(query_mast):
         #else:
         #    outrootdir = '.'
         #print('Default output rootdir: %s' % outrootdir)
-    
+
         parser.add_argument('-n','--skipdownload', action='store_true', default=False, help='skip downloading the data.  (default=%(default)s)')
 #        parser.add_argument('-o','--outrootdir', default=outrootdir, help=('output root directory. (default=%(default)s)'))
 #        parser.add_argument('--outsubdir', default=None, help=('subdir added to the output root directory. If None, then propID is used (default=%(default)s)'))
@@ -71,7 +71,7 @@ class download_mast(query_mast):
     def download_product(self, url, outfilename, clobber=False):
         """
         Download the product url and save it to outfilename.
-        
+
         Parameters
         ----------
         clobber : boolean, optional
@@ -106,20 +106,20 @@ class download_mast(query_mast):
         if rmfile(outfilename,raiseError=False):
             print('ERROR: could not remove old file {outfilename}')
             return(6,'ERRORdel')
-        
+
         tstart = Time.now()
         if self.verbose: print(f'Dowloading file {url} to {outfilename}')
-        
+
         try:
             self.JwstObs._download_file(url, outfilename)
         except Exception as e:
             msg = str(e)
             print(f'ERROR: for file {outfilename}: {msg}')
             return(7,'ERRORdownload')
-         
+
         if not os.path.isfile(outfilename):
             print(f'ERROR: {outfilename} does not exist!!')
-            return(9,'ERRORnotexist')           
+            return(9,'ERRORnotexist')
 
         tend = Time.now()
         if self.verbose: print('time passed for download process: {:.2f} seconds'.format((tend-tstart).to_value('sec')))
@@ -135,26 +135,36 @@ class download_mast(query_mast):
 
         if ix_selected_products is None:
             ix_selected_products = self.ix_selected_products
-                    
+
         if clobber is None:
             clobber=self.params['clobber']
-            
+
 #        if 'dl_code' not in self.imoutcols: self.imoutcols.append('dl_code')
 #        if 'dl_str' not in self.imoutcols: self.imoutcols.append('dl_str')
-        
+
         ixs_exist = productTable.ix_equal('dl_code',2,indices = ix_selected_products)
 
+        skip_string = f'### None of these files are currently present in the output directory. Downloading all.'
         if not self.params['clobber']:
             ixs_download = AnotB(ix_selected_products,ixs_exist)
-            print(f'\n###############################\n### Downloading {len(ixs_download)} files')
-            if len(ixs_exist)>0: print(f'### skipping {len(ixs_exist)} since they already exist')
+            #print(f'\n###############################\n### Downloading {len(ixs_download)} files')
+            if len(ixs_exist)>0:
+                skip_string = f'### skipping {len(ixs_exist)} files since they already exist'
         else:
             ixs_download = ix_selected_products
+            #print(f'\n###############################\n### Downloading {len(ixs_download)} files')
+            if len(ixs_exist)>0:
+                skip_string = f'### clobbering {len(ixs_exist)} files that already exist'
+
+        if len(ixs_download) == 0:
+            print(f'###############################\n### No Files Matching Query. Nothing to download.')
+            sys.exit(0)
+        else:
             print(f'\n###############################\n### Downloading {len(ixs_download)} files')
-            if len(ixs_exist)>0: print(f'### clobbering {len(ixs_exist)} that already exist')
+            print(skip_string)
 
         print(f'Outdir: {self.outdir}/<proposal_id> where <proposal_id> is the value in the proposal_id column')
-        
+
         if ask_confirm_download:
             do_it = input('Do you want to continue and download these products [y/n]?  ')
             if do_it.lower() in ['y','yes']:
@@ -165,11 +175,11 @@ class download_mast(query_mast):
             else:
                 print(f'Hmm, \'{do_it}\' is neither yes or no. Don\'t know what to do, so stopping ....')
                 sys.exit(0)
-                
+
         counter = 1
         successcounter=0
         failedcounter=0
-        
+
         mastURL = self.JwstObs._portal_api_connection.MAST_DOWNLOAD_URL + "?uri="
 
         ixs_download = productTable.ix_sort_by_cols(['proposal_id','obsnum'],indices=ixs_download)
@@ -191,7 +201,7 @@ class download_mast(query_mast):
             else:
                 failedcounter+=1
             counter+=1
-        
+
         print(f'\n### Download complete: {successcounter} successful, {failedcounter} failed\n###############################')
         return(0)
 
@@ -208,27 +218,21 @@ if __name__ == '__main__':
     if download.verbose>2:
         print('params:', download.params)
 
-    # use arguments or $API_MAST_TOKEN to login       
+    # use arguments or $API_MAST_TOKEN to login
     download.login(raiseErrorFlag=True)
-    
+
     # self.outdir is set depending on outrootdir and outsubdir in cfg file or through the options --outrootdir and --outsubdir
     download.set_outdir()
     if download.verbose: print(f'Outdir: {download.outdir}')
-        
-    # make the tables, but don't show them yet, since the output files need to be updated first  
+
+    # make the tables, but don't show them yet, since the output files need to be updated first
     download.mk_all_tables(showtables=True)
-    
+
     if not args.skipdownload and len(download.obsTable.t)>0:
         download.download_products()
         print('\n######################\n### Downloaded Selected Products:\n######################')
         download.productTable.write(indices=download.ix_selected_products,columns=download.params['outcolumns_productTable'])
-        
+
     # make the webpages
-    if args.makewebpages:
+    if args.makewebpages and len(download.productTable.t) > 0:
         download.mk_webpages()
-
-
-        
-
-        
-
