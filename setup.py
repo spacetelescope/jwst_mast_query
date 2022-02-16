@@ -81,6 +81,7 @@ setup(
         'astroquery>=0.4.2',
         'astropy',
         'ipython',
+        'jinja2',
         'numpy',
         'pandas',
         'pyyaml',
