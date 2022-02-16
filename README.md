@@ -154,31 +154,39 @@ Download the fits and jpg files for JWST proposal 1138, taken in the last 1 day 
     jwst_download.py -v -c jwst_query.cfg --outrootdir /jwst_data -l 1 --propID 01138 --makewebpages --filetypes jpg fits
 
 Download the fits files for JWST proposal 1409, observations 3 and 103 only, taken in the last 2 days.  
-`jwst_download.py -v --config jwst_query.cfg --lookbacktime 2 --propID 1409 --obsnums 3 103`
 
-Download the fits and jpg files for JWST proposal 1138, observation 4 only, taken in the last 1 day and create an index.html summary file.  
-`jwst_download.py -v -c jwst_query.cfg --outrootdir /jwst_data -l 1 --propID 01138 --obsnums 4 --makewebpages --filetypes jpg fits`
+    jwst_download.py -v --config jwst_query.cfg --lookbacktime 2 --propID 1409 --obsnums 3 103
+
+Download the fits and jpg files for JWST proposal 1138, observation 4 only, taken in the last 1 day and create an index.html summary file.
+ 
+    jwst_download.py -v -c jwst_query.cfg --outrootdir /jwst_data -l 1 --propID 01138 --obsnums 4 --makewebpages --filetypes jpg fits
 
 Download the fits and jpg files for JWST proposal 1138, observations 4, 5, and 7 only, taken in the last 1 day and create an index.html summary file.  
-`jwst_download.py -v -c jwst_query.cfg --outrootdir /jwst_data -l 1 --propID 01138 --obsnums 4 5 7 --makewebpages --filetypes jpg fits`
+
+    jwst_download.py -v -c jwst_query.cfg --outrootdir /jwst_data -l 1 --propID 01138 --obsnums 4 5 7 --makewebpages --filetypes jpg fits
 
 
 ### Specify dates
 
 Get all files for proposal 743 with an observation date between Aug 11, 2021 16:49:49 and Aug 12, 2021 16:49:49  
-`jwst_download.py -v  -c jwst_query.cfg --propID 743 --date_select 2021-08-11T16:49:49 2021-08-12T16:49:49`
+
+    jwst_download.py -v  -c jwst_query.cfg --propID 743 --date_select 2021-08-11T16:49:49 2021-08-12T16:49:49
 
 Get all files for proposal 743 with an observation date of Aug 11, 2021 16:49:49 or later  
-`jwst_download.py -v  -c jwst_query.cfg --propID 743 --date_select 2021-08-11T16:49:49+`
+
+    jwst_download.py -v  -c jwst_query.cfg --propID 743 --date_select 2021-08-11T16:49:49+
 
 Get all files for proposal 743 with an observation date of Aug 11, 2021 16:49:49 or earlier  
-`jwst_download.py -v  -c jwst_query.cfg --propID 743 --date_select 2021-08-11T16:49:49-`
+
+    jwst_download.py -v  -c jwst_query.cfg --propID 743 --date_select 2021-08-11T16:49:49-
 
 Get all files for proposal 743 with an observation date of MJD 59430.0 or later  
-`jwst_download.py -v  -c jwst_query.cfg --propID 743 --date_select 59430.0+`
+
+    jwst_download.py -v  -c jwst_query.cfg --propID 743 --date_select 59430.0+
  
 Download only the jpg (not the fits) files from the last 5 days, and create a table of results, saved into index.html  
-`jwst_download.py -v -c jwst_query.cfg --outrootdir /my_jwst_data -lookbacktime 5 --makewebpages --filetype jpg`
+
+    jwst_download.py -v -c jwst_query.cfg --outrootdir /my_jwst_data -lookbacktime 5 --makewebpages --filetype jpg
 
 
 
