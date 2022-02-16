@@ -158,6 +158,7 @@ Download the fits files for JWST proposal 1409, observations 3 and 103 only, tak
     jwst_download.py -v --config jwst_query.cfg --lookbacktime 2 --propID 1409 --obsnums 3 103
 
 Download the fits and jpg files for JWST proposal 1138, observation 4 only, taken in the last 1 day and create an index.html summary file.
+
     jwst_download.py -v -c jwst_query.cfg --outrootdir /jwst_data -l 1 --propID 01138 --obsnums 4 --makewebpages --filetypes jpg fits
 
 Download the fits and jpg files for JWST proposal 1138, observations 4, 5, and 7 only, taken in the last 1 day and create an index.html summary file.
