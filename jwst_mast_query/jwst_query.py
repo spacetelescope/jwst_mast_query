@@ -202,6 +202,7 @@ class query_mast:
 
         parser.add_argument('-v','--verbose', default=0, action='count')
         parser.add_argument('--propID', type=int, nargs="+", default=None, help='Search for data for this proposal ID(=APT #) only. If more than one argument: all following arguments are a list of obsnum\'s')
+        parser.add_argument('--obsnums', type=int, nargs='+', default=None, help='Search for data in these observation numbers only.')
         parser.add_argument('--guidestars', action='store_true', default=None, help='Don\'t skip guidestars. By default, they are skipped')
         parser.add_argument('-f','--filetypes',  type=str, nargs="+", default=None, help=('List of product filetypes to get, e.g., _uncal.fits or _uncal.jpg. If only letters, then _ and .fits are added, for example uncal gets expanded to _uncal.fits. Typical image filetypes are uncal, rate, rateints, cal (default=%(default)s)'))
         parser.add_argument('--calib_levels',  type=int, nargs="+", default=None, help=('Only select products with the specified calibration levels (calib_level column in productTable) (default=%(default)s)'))
@@ -289,6 +290,20 @@ class query_mast:
             print(f'Loading config file {args.configfile}')
             cfgparams = yaml.load(open(args.configfile,'r'), Loader=yaml.FullLoader)
             self.params.update(cfgparams)
+
+            # Make sure propID and obsnums, if they have been entered in the config file,
+            # are lists, rather than integers.
+            list_keys = ['propID', 'obsnums']
+            #list_keys = ['obsnums']
+            for key in list_keys:
+                if key in self.params.keys():
+                    if not isinstance(self.params[key], list):
+                        self.params[key] = [self.params[key]]
+
+            # Ensure that the propID is a 5-digit string
+            if 'propID' in self.params.keys():
+                self.params['propID'] = ['%05d' % (int(self.params['propID'][0]))]
+
             subenvvarplaceholder(self.params)
 
             if args.verbose>2:
@@ -315,10 +330,11 @@ class query_mast:
                     self.params[arg]=None
 
         # propID
-        self.params['obsnums']=None
+        if 'obsnums' not in self.params.keys():
+            self.params['obsnums']=None
         if self.params['propID'] is not None:
-            if len(self.params['propID'])>1:
-                self.params['obsnums'] = self.params['propID'][1:]
+        #    if len(self.params['propID'])>1:
+        #        self.params['obsnums'] = self.params['propID'][1:]
             self.params['propID'] = '%05d' % (int(self.params['propID'][0]))
         print('propID',self.params['propID'])
         print('obsnums',self.params['obsnums'])
