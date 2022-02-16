@@ -234,5 +234,5 @@ if __name__ == '__main__':
         download.productTable.write(indices=download.ix_selected_products,columns=download.params['outcolumns_productTable'])
 
     # make the webpages
-    if args.makewebpages:
+    if args.makewebpages and len(download.productTable.t) > 0:
         download.mk_webpages()

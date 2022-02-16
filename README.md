@@ -45,6 +45,19 @@ Inputs to the command line call of **jwst_download.py** are optional. Below we s
 
 `jwst_download.py -v --propID 1410 --config jwst_query.cfg --lookbacktime 3 --sca a1 a2`
 
+### Common command line options
+
+- --lookbacktime : The number of days before the present to use as the beginning of the query
+
+- --propID : The JWST proposal number. Note that this input can be in several formats:
+    - A single number (e.g. `--propID 1409`), in which case all data from the given proposal may be retrieved
+    - Two numbers (e.g. `--propID 1409 4`), in which case data only from observation number 4 of program 1409 may be retrieved
+    - A longer list of numbers (e.g. `--propID 1409 3 4 5 6`), in which case all numbers after the proposal number are treated as observation numbers. In this example, files from observations 3, 4, 5, and 6 of proposal 1409 will be retrievd
+    Note that this more complex input format is not currently supported in the config file, and must be specified at the command line.
+
+- --makewebpages : If set, an index.html file is generated, containing info and images of the retrieved data. Note that this option is not currently in the config file, and must be specified at the command line.
+
+
 These are just a few of the options that can be set. The rest are specified in the config file provided in the call. Config file details are given below.
 For more example calls, see the **Examples** section below.
 
@@ -81,8 +94,10 @@ The config file is a convenient way to set and keep track of parameter values. T
 | sortcols_obsTable: ['date_min','proposal_id','obsnum']                                              | The obsTable is sorted based on these columns. The defaults sort the table in the order the observations were observed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | sortcols_summaryTable: ['date_start','proposal_id','obsnum']                                        | The summary table is sorted based on these columns. The default sorts the table in the order the observations were observed                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
 | date_select: []                                                                                     | Specify date range (MJD or isot format) applied to "dateobs_center" column. If single value, then only exact matches will be returned. If a single value has "+" or "-" at the end, then it is a lower and upper limit, respectively. Examples: 58400+, 58400-, 2020-11-23+,2020-11-23 2020-11-25                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| savetables:                                                                                         | Save the tables (selected products, obsTable, summary with suffix selprod.txt, obs.txt, summary.txt, respectively) with the specified string as basename. If not set, default names are *.summary.txt*, *.obs.txt*, and *.selprod.txt* Tables are saved in the same output directory as the data.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-
+| savetables:                                                                                         | Save the tables (selected products, obsTable, summary with suffix selprod.txt, obs.txt, summary.txt, respectively) with the specified string as basename. Filenames will then be *xxxx.summary.txt*, *xxxx.obs.txt*, and *xxxx.selprod.txt*, where xxxx is the savetables value. Tables are saved in the same output directory as the data.  If no string is provided, the tables are not saved.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| webpage_thumbnail_width: 100                                                                        | Width in pixels of the resized jpg images to be inserted into the index.html summary file. |
+| webpage_thumbnail_height:                                                                           | Height in pixels of the resized jpg images to be inserted into the index.html summary file. If left undefined, the height will be determined from webpage_thumbnail_width and the aspect ratio of the original image.              |
+| webpage_level12_jpgs: ['\_uncal.jpg','\_dark.jpg','\_rate.jpg','\_rateints.jpg','\_trapsfilled.jpg','\_cal.jpg','\_crf.jpg'] | Filetypes whose thumbnails will be shown in index.html. |
 
 
 ## Outputs
@@ -131,7 +146,19 @@ Get all NIRCam NRCA1 and NRCA2 files for proposal 1410 taken in the last 3 days
 `jwst_download.py -v --propID 1410 --config jwst_query.cfg --lookbacktime 3 --sca a1 a2`
 
 
-### Examples calls using specified date limits
+### Specify a proposal ID and specific observation numbers
+
+Download the fits and jpg files for JWST proposal 1138, taken in the last 1 day and create an index.html summary file.
+`jwst_download.py -v -c jwst_query.cfg --outrootdir /jwst_data -l 1 --propID 01138 --makewebpages --filetypes jpg fits`
+
+Download the fits and jpg files for JWST proposal 1138, observation 4 only, taken in the last 1 day and create an index.html summary file.
+`jwst_download.py -v -c jwst_query.cfg --outrootdir /jwst_data -l 1 --propID 01138 4 --makewebpages --filetypes jpg fits`
+
+Download the fits and jpg files for JWST proposal 1138, observations 4, 5, and 7 only, taken in the last 1 day and create an index.html summary file.
+`jwst_download.py -v -c jwst_query.cfg --outrootdir /jwst_data -l 1 --propID 01138 4 5 7 --makewebpages --filetypes jpg fits`
+
+
+### Specify dates
 
 Get all files for proposal 743 with an observation date between Aug 11, 2021 16:49:49 and Aug 12, 2021 16:49:49
 `jwst_download.py -v  -c jwst_query.cfg --propID 743 --date_select 2021-08-11T16:49:49 2021-08-12T16:49:49`
@@ -145,6 +172,9 @@ Get all files for proposal 743 with an observation date of Aug 11, 2021 16:49:49
 Get all files for proposal 743 with an observation date of MJD 59430.0 or later
 `jwst_download.py -v  -c jwst_query.cfg --propID 743 --date_select 59430.0+`
  
+Download only the jpg (not the fits) files from the last 5 days, and create a table of results, saved into index.html:
+`jwst_download.py -v -c jwst_query.cfg --outrootdir /my_jwst_data -lookbacktime 5 --makewebpages --filetype jpg`
+
 
 
 [//]: # (jwst_download.py --lre5 -v  -c jwst_query.cfg --propID 743 --obsid_select 55783016+   But no one will know this obsid for their project)
