@@ -142,14 +142,16 @@ The table of selected products gives even more details about each downloaded pro
 
 ## Examples
 
-Get all NIRCam NRCA1 and NRCA2 files for proposal 1410 taken in the last 3 days  
-`jwst_download.py -v --propID 1410 --config jwst_query.cfg --lookbacktime 3 --sca a1 a2`
+Get all NIRCam NRCA1 and NRCA2 files for proposal 1410 taken in the last 3 days
+
+    jwst_download.py -v --propID 1410 --config jwst_query.cfg --lookbacktime 3 --sca a1 a2
 
 
 ### Specify a proposal ID and specific observation numbers
 
 Download the fits and jpg files for JWST proposal 1138, taken in the last 1 day and create an index.html summary file.  
-`jwst_download.py -v -c jwst_query.cfg --outrootdir /jwst_data -l 1 --propID 01138 --makewebpages --filetypes jpg fits`
+
+    jwst_download.py -v -c jwst_query.cfg --outrootdir /jwst_data -l 1 --propID 01138 --makewebpages --filetypes jpg fits
 
 Download the fits files for JWST proposal 1409, observations 3 and 103 only, taken in the last 2 days.  
 `jwst_download.py -v --config jwst_query.cfg --lookbacktime 2 --propID 1409 --obsnums 3 103`
