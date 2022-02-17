@@ -33,7 +33,7 @@ These environment variables are not required, but they make life easier:
 
 ## Use
 
-The jwst_mast_query package contains two tools, both designed to be alled from the command line. The first is **jwst_download.py**. This script will query MAST for files matching the input parameters, and then download those files into a local output directory specified by the user. There is also an option to download associated jpgs from MAST and create a simple index.html file with a table containing these preview images and basic observation information. If requested, the script will also save ascii tables with information on the files identified by the query.
+The jwst_mast_query package contains two tools, both designed to be called from the command line. The first is **jwst_download.py**. This script will query MAST for files matching the input parameters, and then download those files into a local output directory specified by the user. There is also an option to download associated jpgs from MAST and create a simple index.html file with a table containing these preview images and basic observation information. If requested, the script will also save ascii tables with information on the files identified by the query.
 
 The other script is **jwst_query.py**. This script will query MAST for files matching the input parameters. **jwst_download.py** wraps around **jwst_query.py** and provides the abiltiy to download the files identified by **jwst_query.py**.  
 
@@ -41,7 +41,9 @@ The other script is **jwst_query.py**. This script will query MAST for files mat
 
 ## Inputs
 
-Inputs to the command line call of **jwst_download.py** are optional. Below we show an example of a typical call, with a few options specified. In this case, we specify verbose mode (`-v`) in order to get more details printed to the screen as the command runs. In addition, we want to locate data from JWST proposal 1410 (`--propID`). We specify the name of the config file using `--config`. Since there is no path given, it is assumed that the config file is in the current working directory. We set the `--lookbacktime` to 3 days. This means that **jwst_download.py** will only search for observations taken within the last 3 days. Finally, we request data only from NIRCam's NRCA1 and NRCA2 detectors using the `--sca` option.
+Inputs to the command line call of **jwst_download.py** are optional, but we recommend at a minimum using a configuration file to define input parameters. To get started, download/copy the [configuration file](https://github.com/spacetelescope/jwst_mast_query/blob/main/jwst_mast_query/jwst_query.cfg) from the repository. For a detailed description of the options in the configuration file, see the **Config File** section below.
+
+Below we show an example of a typical call to **jwsst_download.py**, with a few options specified. In this case, we specify verbose mode (`-v`) in order to get more details printed to the screen as the command runs. In addition, we want to locate all data from JWST proposal 1410 (`--propID`). We specify the name of the config file using `--config`. Since there is no path given, it is assumed that the config file is in the current working directory. We set the `--lookbacktime` to 3 days. This means that **jwst_download.py** will only search for observations taken within the last 3 days. Finally, we request data only from NIRCam's NRCA1 and NRCA2 detectors using the `--sca` option.
 
 `jwst_download.py -v --propID 1410 --config jwst_query.cfg --lookbacktime 3 --sca a1 a2`
 
@@ -66,7 +68,7 @@ For more example calls, see the **Examples** section below.
 #### Hierarchy
 Most config parameters get their values from one of three places: defaults, the config file, and command line arguments. 
 
-When **jwst_download.py** or **jwst_query.py** are run, first the config file is read in, and all parameters in the config file are saved in self.params, overwriting the existing default values. Then the command line optional arguments are stored in self.params if they are not set to None, overwriting the config file parameters.
+When **jwst_download.py** or **jwst_query.py** are run, first the config file is read in, and all parameters in the config file are saved in self.params, overwriting the existing default values. Then, any command line arguments that are provided are added to self.params, overwriting the config file parameters.
 
 #### Config file
 
