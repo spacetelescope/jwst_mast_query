@@ -1056,20 +1056,59 @@ class query_mast:
         if height is None:
             height=self.params['webpage_thumbnail_height']
 
-        propIDs = unique(productTable.t.loc[ix_selected_products,'proposal_id'])
-        for propID in propIDs:
-            propID = int(propID)
-            htmlname = f'{self.outdir}/{propID:05d}/index.html'
+        if not self.params['skip_propID2outsubdir']:
+            propIDs = unique(productTable.t.loc[ix_selected_products,'proposal_id'])
+            for propID in propIDs:
+                propID = int(propID)
+                htmlname = f'{self.outdir}/{propID:05d}/index.html'
+
+                # get all indices for uncal.jpg
+                ixs_propID = productTable.ix_equal('proposal_id',propID,indices=ix_selected_products)
+                ixs_uncal  = productTable.ix_equal('filetype','_uncal.jpg',indices=ixs_propID)
+                ixs_uncal =  productTable.ix_sort_by_cols(self.params['sortcols_productTable'],indices=ixs_uncal)
+
+                # figure out the jpg suffixes, and define the column names
+                suffixes = self.params['webpage_level12_jpgs']
+                filetypes_propID = unique(productTable.t.loc[ixs_propID,'filetype'])
+                suffixes = AandB(suffixes,filetypes_propID,keeporder=True)
+                figcols=[]
+                for suffix in suffixes:
+                    figcols.append(re.sub('_|\.jpg$','',suffix))
+
+                #make the thumbnails
+                for ix in ixs_uncal:
+                    for suffix,figcol in zip(suffixes,figcols):
+                        jpgname = f"{productTable.t.loc[ix,'obs_id']}{suffix}"
+                        # make a thumbnail that links to the full size image
+                        productTable.t.loc[ix,figcol]=image_thumbnail(jpgname,width=width,height=height)
+                        #productTable.t.loc[ix,figcol]=addlink2string(imagestring4web(jpgname,width=None,height=p),jpgname)
+
+                # get the outcols
+                outcols=['proposal_id','obsnum','obsID','parent_obsid','sca','size']
+                # make sure the columns exist
+                outcols=AandB(outcols,productTable.t.columns,keeporder=True)
+                outcols.extend(figcols)
+                outcols.extend(['obs_id','outfilename'])
+
+                # write it to index.html
+                print(f'writing propID={propID} html to {htmlname}')
+                productTable.write(filename=htmlname, indices=ixs_uncal, columns=outcols, htmlflag=True, escape=False)
+        else:
+            propIds = ['00000']
+            # Here the user has requested not to put the data into separate directories for each propID.
+            # So everything goes into outrootdir. index.html should go there, and the links to
+            # the jpgs need to point there as well.
+            htmlname = f'{self.outdir}/index.html'
 
             # get all indices for uncal.jpg
-            ixs_propID = productTable.ix_equal('proposal_id',propID,indices=ix_selected_products)
-            ixs_uncal  = productTable.ix_equal('filetype','_uncal.jpg',indices=ixs_propID)
+            ixs_uncal  = productTable.ix_equal('filetype','_uncal.jpg',indices=ix_selected_products)
             ixs_uncal =  productTable.ix_sort_by_cols(self.params['sortcols_productTable'],indices=ixs_uncal)
 
             # figure out the jpg suffixes, and define the column names
             suffixes = self.params['webpage_level12_jpgs']
-            filetypes_propID = unique(productTable.t.loc[ixs_propID,'filetype'])
+            filetypes_propID = unique(productTable.t.loc[:,'filetype'])
             suffixes = AandB(suffixes,filetypes_propID,keeporder=True)
+
             figcols=[]
             for suffix in suffixes:
                 figcols.append(re.sub('_|\.jpg$','',suffix))
@@ -1078,9 +1117,9 @@ class query_mast:
             for ix in ixs_uncal:
                 for suffix,figcol in zip(suffixes,figcols):
                     jpgname = f"{productTable.t.loc[ix,'obs_id']}{suffix}"
+                    print('JPGNAME: ', jpgname)
                     # make a thumbnail that links to the full size image
                     productTable.t.loc[ix,figcol]=image_thumbnail(jpgname,width=width,height=height)
-                    #productTable.t.loc[ix,figcol]=addlink2string(imagestring4web(jpgname,width=None,height=p),jpgname)
 
             # get the outcols
             outcols=['proposal_id','obsnum','obsID','parent_obsid','sca','size']
@@ -1090,8 +1129,9 @@ class query_mast:
             outcols.extend(['obs_id','outfilename'])
 
             # write it to index.html
-            print(f'writing propID={propID} html to {htmlname}')
+            print(f'writing html to {htmlname}')
             productTable.write(filename=htmlname, indices=ixs_uncal, columns=outcols, htmlflag=True, escape=False)
+
 
     def mk_all_tables(self, filetypes=None, showtables=True):
 
