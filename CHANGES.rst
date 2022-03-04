@@ -1,3 +1,8 @@
+Unreleased
+==========
+
+Add a .gitignore file to the repository (#22)
+
 0.0.1
 =====
 
