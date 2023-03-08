@@ -5,7 +5,7 @@ Created on Wed July 28 11:01:23 2021
 
 @author: arest, bhilbert
 """
-from astroquery.mast import Mast
+from astroquery.mast import Mast, Observations
 from astropy.time import Time
 import numpy as np
 import pandas as pd
@@ -547,13 +547,25 @@ class query_mast:
 
         print('MJD range:',mjd_min, mjd_max)
 
+        # Work-around for MAST update, where instrument name being changed to
+        # a string of the format "<instrument>/<mode>" rather than "<instrument>"
+        # e.g "MIRI/IMAGE" rather than "MIRI". Wildcards are not yet supported
+        # by astroquery when working with the JwstFiltered data, so we need to
+        # get a list of all possible modes associated with the proposal, and then
+        # query for each separately
+
+        # To get the list of modes, we can query using Observations, which does support
+        # wildcard characters, but returnes only limited information. In this case, we
+        # care only about the instrument_name values in the results.
+        inst_list = list(set(Observations.query_criteria(instrument_name=f'{instrument}*',
+                                                         t_min=[mjd_min, mjd_max])['instrument_name']))
+
         columns = ','.join(self.params['mastcolumns_obsTable'])
         service = self.SERVICES['Caom_search']
         params = {"columns":columns,
                   "filters":[
                   {"paramName":"obs_collection","values":["JWST"]},
-                  {"paramName":"instrument_name","values":[instrument]},
-#                  {"paramName":"proposal_id","values":[propID]},
+                  {"paramName":"instrument_name","values":inst_list},
                   {"paramName":"t_min",
                     "values":[{"min":mjd_min,"max":mjd_max}]},
                   ]}
@@ -568,7 +580,7 @@ class query_mast:
             print('query params:',params)
 
         if token is not None:
-            self.obsTable.t = self.JwstObs.service_request(service, params,mast_token=token).to_pandas()
+            self.obsTable.t = self.JwstObs.service_request(service, params, mast_token=token).to_pandas()
         else:
             self.obsTable.t = self.JwstObs.service_request(service, params).to_pandas()
         if self.verbose:
