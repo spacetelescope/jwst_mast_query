@@ -5,7 +5,7 @@ Created on Wed July 28 11:01:23 2021
 
 @author: arest, bhilbert
 """
-from astroquery.mast import Mast
+from astroquery.mast import Mast, Observations
 from astropy.time import Time
 import numpy as np
 import pandas as pd
@@ -194,15 +194,15 @@ class query_mast:
         self.params['filetypes']=['uncal']
         self.params['guidestars']=False
         self.params['lookbacktime']=1.0
-        
-        
+
+
         self.params['skip_propID2outsubdir']=None
         self.params['obsnum2outsubdir']=None
         self.params['propIDs_obsnum2outsubdir']=[]
         self.params['jpg_separate_subdir']=False
-        
+
         self.params['webpage_tablefigsize_width']=100
-        self.params['webpage_tablefigsize_height']=None 
+        self.params['webpage_tablefigsize_height']=None
         self.params['webpage_level12_jpgs']=['_uncal.jpg','_dark.jpg','_rate.jpg','_rateints.jpg','_trapsfilled.jpg','_cal.jpg','_crf.jpg']
 
 
@@ -273,7 +273,7 @@ class query_mast:
 #        time_group.add_argument('--lre6', action='store_true', default=None, help='Use the LRE-6 date limits. Overrides lookback and mjd* options.')
 
         parser.add_argument('-s', '--savetables', type=str, default=None, help='save the tables (selected products, obsTable, summary with suffix selprod.txt, obs.txt, summary.txt, respectively) with the specified string as basename (default=%(default)s)')
-        parser.add_argument('-w', '--makewebpages', action='store_true', default=False, help='Make webpages for the products for each propID using the downloaded *jpg files')        
+        parser.add_argument('-w', '--makewebpages', action='store_true', default=False, help='Make webpages for the products for each propID using the downloaded *jpg files')
 
 
         return(parser)
@@ -372,7 +372,7 @@ class query_mast:
 
         if 'obsnums' not in self.params.keys():
             self.params['obsnums']=None
-            
+
         # propID
         if self.params['propID'] is not None:
             if len(self.params['propID'])>1:
@@ -547,13 +547,25 @@ class query_mast:
 
         print('MJD range:',mjd_min, mjd_max)
 
+        # Work-around for MAST update, where instrument name being changed to
+        # a string of the format "<instrument>/<mode>" rather than "<instrument>"
+        # e.g "MIRI/IMAGE" rather than "MIRI". Wildcards are not yet supported
+        # by astroquery when working with the JwstFiltered data, so we need to
+        # get a list of all possible modes associated with the proposal, and then
+        # query for each separately
+
+        # To get the list of modes, we can query using Observations, which does support
+        # wildcard characters, but returnes only limited information. In this case, we
+        # care only about the instrument_name values in the results.
+        inst_list = list(set(Observations.query_criteria(instrument_name=f'{instrument}*',
+                                                         t_min=[mjd_min, mjd_max])['instrument_name']))
+
         columns = ','.join(self.params['mastcolumns_obsTable'])
         service = self.SERVICES['Caom_search']
         params = {"columns":columns,
                   "filters":[
                   {"paramName":"obs_collection","values":["JWST"]},
-                  {"paramName":"instrument_name","values":[instrument]},
-#                  {"paramName":"proposal_id","values":[propID]},
+                  {"paramName":"instrument_name","values":inst_list},
                   {"paramName":"t_min",
                     "values":[{"min":mjd_min,"max":mjd_max}]},
                   ]}
@@ -568,7 +580,7 @@ class query_mast:
             print('query params:',params)
 
         if token is not None:
-            self.obsTable.t = self.JwstObs.service_request(service, params,mast_token=token).to_pandas()
+            self.obsTable.t = self.JwstObs.service_request(service, params, mast_token=token).to_pandas()
         else:
             self.obsTable.t = self.JwstObs.service_request(service, params).to_pandas()
         if self.verbose:
@@ -807,7 +819,7 @@ class query_mast:
         #self.productTable.write()
         if self.verbose:
             print(f'productTable obtained with {len(self.productTable.t)} entries')
-        
+
         # remove guide stars if wanted...
         if not guidestars:
             ixs_products = self.productTable.getindices()
@@ -834,8 +846,8 @@ class query_mast:
         # get the visit number
         self.productTable.t['visit']= self.productTable.t['obs_id'].str.extract(r'^jw\d{8}(\d{3})_\d{2}\d{1}\d{2}_')
         #self.productTable.t['vstgrp']= self.productTable.t['obs_id'].str.extract(r'^jw\d{8}\d{3}_(\d{2})\d{1}\d{2}_')
-        
-        # mark all products that are fits or jpg in separate columns 
+
+        # mark all products that are fits or jpg in separate columns
         self.productTable.t['fits']=self.productTable.t['jpg']=False
         ixs_fits = self.productTable.ix_matchregex('filetype',r'\.fits$')
         self.productTable.t.loc[ixs_fits,'fits']=True
@@ -971,13 +983,13 @@ class query_mast:
         new_ix_obs_sorted = AandB(ix_obs_sorted,new_ix_obs_sorted)
 
         return(new_ix_obs_sorted)
-    
+
     def get_outdir(self,productTable, ix,
                    outdir=None,
                    skip_propID2outsubdir=False,
                    obsnum2outsubdir=False,
                    jpg_separate_subdir=False):
-            
+
         if outdir is None:
             outdir = self.outrootdir
         if outdir is None:
@@ -995,14 +1007,14 @@ class query_mast:
                 outdir += '/NA'
             else:
                 outdir += f'/obsnum{productTable.t.loc[ix,"obsnum"]:02d}'
-                
+
         if jpg_separate_subdir and productTable.t.loc[ix,"jpg"]:
             outdir += '/jpg'
-        
+
         return(outdir)
 
-    
-    def mk_outfilename(self, productTable, ix, 
+
+    def mk_outfilename(self, productTable, ix,
                        outdir=None,
                        skip_propID2outsubdir=False,
                        obsnum2outsubdir=False,
@@ -1068,7 +1080,7 @@ class query_mast:
 
         self.outrootdir = os.path.abspath(self.outrootdir)
         return(self.outrootdir)
-    
+
 
     def mk_outfilenames(self,
                         productTable=None,
@@ -1230,7 +1242,7 @@ class query_mast:
         self.ix_summary_sorted = self.summary.ix_sort_by_cols(self.params['sortcols_summaryTable'])
 
         return(0)
-                
+
     def TNjpgname(self,jpgname):
         TNname = re.sub('jpg$','TN.jpg',jpgname)
         if TNname==jpgname:
@@ -1251,27 +1263,27 @@ class query_mast:
 
         img = img.resize((tn_width, tn_height), Image.ANTIALIAS)
         img.save(TNjpgname)
-        
 
-    def mk_thumbnails(self, productTable, ixs, 
-                      jpg_separate_subdir=None,figcols=None, 
+
+    def mk_thumbnails(self, productTable, ixs,
+                      jpg_separate_subdir=None,figcols=None,
                       tn_width=None, tn_height=None, overwrite=None):
 
         if tn_width is None:
-            tn_width=self.params['webpage_thumbnails_width'] 
+            tn_width=self.params['webpage_thumbnails_width']
 
         if tn_height is None:
-            tn_height=self.params['webpage_thumbnails_height'] 
-            
+            tn_height=self.params['webpage_thumbnails_height']
+
         if jpg_separate_subdir is None:
-            jpg_separate_subdir=self.params['jpg_separate_subdir'] 
-            
+            jpg_separate_subdir=self.params['jpg_separate_subdir']
+
         if figcols is None:
-           figcols =self.params['webpage_level12_jpgs'] 
+           figcols =self.params['webpage_level12_jpgs']
 
         if overwrite is None:
-           overwrite =self.params['webpage_thumbnails_overwrite'] 
-        
+           overwrite =self.params['webpage_thumbnails_overwrite']
+
         ixs_uncal  = productTable.ix_equal('filetype','_uncal.fits',indices=ixs)
 
         if len(ixs_uncal)==0:
@@ -1284,7 +1296,7 @@ class query_mast:
             if not re.search('^_',suffix): suffix=f'_{suffix}'
             if not re.search('\.jpg$',suffix): suffix+='.jpg'
             suffixes.append(suffix)
-        
+
         #make the thumbnails
         print(f'Making thumbnails for {suffixes}')
         for ix in ixs_uncal:
@@ -1307,27 +1319,27 @@ class query_mast:
                        tn_width=None, tn_height=None,
                        figcols=None, fitskeys2table=None,
                        sortcols=None, mkthumbnails=None):
-       
+
         if width is None:
-            width=self.params['webpage_tablefigsize_width'] 
+            width=self.params['webpage_tablefigsize_width']
 
         if height is None:
-            height=self.params['webpage_tablefigsize_height'] 
-            
+            height=self.params['webpage_tablefigsize_height']
+
         if jpg_separate_subdir is None:
-            jpg_separate_subdir=self.params['jpg_separate_subdir'] 
+            jpg_separate_subdir=self.params['jpg_separate_subdir']
 
         if figcols is None:
-           figcols =self.params['webpage_level12_jpgs'] 
-           
+           figcols =self.params['webpage_level12_jpgs']
+
         if fitskeys2table is None:
            fitskeys2table = self.params['webpage_fitskeys2table']
-            
+
         if sortcols is None:
-           sortcols =self.params['webpage_sortcols'] 
+           sortcols =self.params['webpage_sortcols']
 
         if mkthumbnails is None:
-           mkthumbnails =self.params['webpage_mkthumbnails'] 
+           mkthumbnails =self.params['webpage_mkthumbnails']
 
         ixs_uncal  = productTable.ix_equal('filetype','_uncal.fits',indices=ixs)
         ixs_uncal =  productTable.ix_sort_by_cols(sortcols,indices=ixs_uncal)
@@ -1344,37 +1356,37 @@ class query_mast:
             if not re.search('^_',suffix): suffix=f'_{suffix}'
             if not re.search('\.jpg$',suffix): suffix+='.jpg'
             suffixes.append(suffix)
-            
-        
+
+
         # copy the fitsheader keywords to the table
         productTable.fitsheader2table('outfilename',indices=ixs_uncal,
                                       optionalfitskey=fitskeys2table)
-        
+
         if mkthumbnails:
-            self.mk_thumbnails(productTable, ixs_uncal, 
-                               jpg_separate_subdir=jpg_separate_subdir,figcols=figcols, 
+            self.mk_thumbnails(productTable, ixs_uncal,
+                               jpg_separate_subdir=jpg_separate_subdir,figcols=figcols,
                                tn_width=tn_width, tn_height=tn_height)
-        
-        #add the figures to the table 
+
+        #add the figures to the table
         for ix in ixs_uncal:
             outdir = os.path.dirname(productTable.t.loc[ix,'outfilename'])
             if jpg_separate_subdir: outdir += '/jpg'
 
-            # get the subdir of outdir that is not common with the html dir            
+            # get the subdir of outdir that is not common with the html dir
             (commonpath,subdir)=split_commonpath(outdir, os.path.dirname(htmlname))
             if commonpath == '': raise RuntimeError(f'Somethings is wrong, htmldir={os.path.dirname(htmlname)} has no common path with outdir={outdir}')
-            
+
             for suffix,figcol in zip(suffixes,figcols):
                 if  subdir=='':
                     jpgname = f"{productTable.t.loc[ix,'obs_id']}{suffix}"
                 else:
                     jpgname = f"{subdir}/{productTable.t.loc[ix,'obs_id']}{suffix}"
-                
+
                 if mkthumbnails:
                     TNjpgname = self.TNjpgname(jpgname)
                 else:
                     TNjpgname=None
-                    
+
                 # make a thumbnail that links to the full size image
                 productTable.t.loc[ix,figcol]=image4table(jpgname,TNimagename=TNjpgname,width=width,height=height)
                 #productTable.t.loc[ix,figcol]=addlink2string(imagestring4web(jpgname,width=None,height=p),jpgname)
@@ -1387,7 +1399,7 @@ class query_mast:
             outcols4ascci.remove(figcol)
         print(f'writing {description} pandas ascii to {asciiname}')
         productTable.write(filename=asciiname, indices=ixs_uncal, columns=outcols4ascci)
-        
+
         # write the table to index.html
         print(f'writing {description} html to {htmlname}')
         f=open(htmlname,'w')
@@ -1397,7 +1409,7 @@ class query_mast:
         if errorflag: raise RuntimeError(f'Soemthing went wrong when doing the webpage table for {description}')
         f.writelines(lines)
         f.close()
-        
+
         # Make sure sortable.js is in the html directory
         htmldir = os.path.dirname(htmlname)
         jsfilename = f'{os.path.dirname(os.path.realpath(sys.argv[0]))}/sortable.js'
@@ -1406,10 +1418,10 @@ class query_mast:
             if not os.path.isfile(jsfilename):
                 raise RuntimeError(f'java script {jsfilename} for sortable tables does not exist!')
             shutil.copy(jsfilename, dest_jsfilename)
-        
+
         return(0)
 
-    def mk_webpages4propIDs(self, productTable=None, ix_selected_products=None, 
+    def mk_webpages4propIDs(self, productTable=None, ix_selected_products=None,
                             jpg_separate_subdir=None,
                             width=None, height=None,
                             figcols=None, fitskeys2table=None,
@@ -1420,7 +1432,7 @@ class query_mast:
 
         if ix_selected_products is None:
             ix_selected_products = self.ix_selected_products
-                   
+
         propIDs = unique(productTable.t.loc[ix_selected_products,'proposal_id'])
         for propID in propIDs:
             if self.verbose:
@@ -1520,7 +1532,7 @@ class query_mast:
             self.summary.write(filename=self.params['savetables']+'.summary.txt',indices=self.ix_summary_sorted,verbose=2)
 
         return(0)
-    
+
 
 
 if __name__ == '__main__':
