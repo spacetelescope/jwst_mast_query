@@ -8,9 +8,41 @@ import numpy as np
 from astropy.time import Time
 import astropy.io.fits as fits
 import pandas as pd
+from pandas.core.dtypes.common import is_object_dtype,is_float_dtype,is_string_dtype,is_integer_dtype
+
 from astropy.nddata import bitmask
+from astropy import units as u
+from astropy.coordinates import SkyCoord
 
 from scipy.interpolate import interp1d
+
+def split_commonpath(path1,path2, strip_basenames=False, raiseError=True):
+    """
+    compare two paths, and return the common path, and whatever is left from 
+    path1 that is not common
+
+    Parameters
+    ----------
+    path1 : string
+    path2 : string
+    strip_basenames: if True, then the basenames are removed before the split
+    raiseError: if True
+    Returns
+    -------
+    (commonpath,not_common)
+
+    """
+    if strip_basenames:
+        path1 = os.path.basename(path1)
+        path2 = os.path.basename(path2)
+        
+    commonpath = os.path.commonpath([path1,path2])
+    if len(commonpath)==0:
+        return('',path1)
+    not_common = path1[len(commonpath):]
+    not_common = not_common.lstrip("/")
+    commonpath = commonpath.rstrip("/")
+    return(commonpath,not_common)
 
 def makepath(path,raiseError=True):
     if path == '':
@@ -30,7 +62,34 @@ def makepath4file(filename,raiseError=True):
         return(makepath(path,raiseError=raiseError))
     else:
         return(0)
+     
+def rmfile(filename,raiseError=1,gzip=False):
+    " if file exists, remove it "
+    if os.path.lexists(filename):
+        os.remove(filename)
+        if os.path.isfile(filename):
+            if raiseError == 1:
+                raise RuntimeError('ERROR: Cannot remove %s' % filename)
+            else:
+                return(1)
+    if gzip and os.path.lexists(filename+'.gz'):
+        os.remove(filename+'.gz')
+        if os.path.isfile(filename+'.gz'):
+            if raiseError == 1:
+                raise RuntimeError('ERROR: Cannot remove %s' % filename+'.gz')
+            else:
+                return(2)
+    return(0)
 
+def rmfiles(filenames,raiseError=1,gzip=False):
+    if not (type(filenames) is list):
+        raise RuntimeError("List type expected as input to rmfiles")
+    errorflag = 0
+    for filename in filenames:
+        errorflag |= rmfile(filename,raiseError=raiseError,gzip=gzip)
+    return(errorflag)
+
+    
 #https://numpy.org/doc/stable/reference/routines.set.html
 def AorB(A,B):
     if len(A) == 0:
@@ -88,6 +147,20 @@ def unique(A):
             unique.append(a)
     return unique
 
+def radec2coord(ra, dec):
+    unit = [u.deg, u.deg]
+    if ':' in str(ra):
+        # Assume input RA/DEC are hour/degree
+        unit[0] = u.hourangle
+
+    try:
+        coord = SkyCoord(ra, dec, frame='icrs', unit=unit)
+        return(coord)
+    except ValueError:
+        print(f'ERROR: cannot interpret: RA={ra} DEC={dec}')
+        return(None)
+
+
 
 class pdastroclass:
     def __init__(self,hexcols=[],hexcol_formatters={},**kwargs):
@@ -102,6 +175,9 @@ class pdastroclass:
         self.hexcols=hexcols
         self.hexcol_formatters=hexcol_formatters
 
+        # if a file is successfully loaded, the filename is saved in this varviable
+        self.filename = None
+
 
         # if self.default_dtypeMapping != None, then the dtype mapping is applied to the table .to_string() is called in self.write
         # This makes sure that formatters don't throw errors if the type of a column got changed to float or object during
@@ -115,12 +191,16 @@ class pdastroclass:
         # example:
         # self.default_formatters = {'MJD':'{:.6f}'.format,'counter':'{:05d}'.format}
 
+        # add list of columns to be skipped when using write function 
+        self.skipcols = []
+       
         # dictionary for the splines. arguments are the y columns of the spline
         self.spline={}
 
 
     def load_lines(self,lines,sep='\s+',**kwargs):
-        errorflag = self.load_spacesep(io.StringIO('\n'.join(lines)),sep=sep,**kwargs)
+        #errorflag = self.load_spacesep(io.StringIO('\n'.join(lines)),sep=sep,**kwargs)
+        errorflag = self.load_spacesep(io.StringIO('\n'.join(lines)),**kwargs)
         return(errorflag)
 
     def load_cmpfile(self,filename,**kwargs):
@@ -150,29 +230,31 @@ class pdastroclass:
         return(errorflag,cmphdr)
 
     def load_spacesep(self,filename,test4commentedheader=True,namesMapping=None,roundingMapping=None,
-                      hexcols=None,auto_find_hexcols=True,
+                      hexcols=None,auto_find_hexcols=True, delim_whitespace=True,
                       na_values=['None','-','--'],verbose=False,**kwargs):
 
-        kwargs['delim_whitespace']=True
+        #kwargs['delim_whitespace']=True
 
         #also test for commented header to make it compatible to old format.
         self.load(filename,na_values=na_values,test4commentedheader=test4commentedheader,
-                  namesMapping=namesMapping,roundingMapping=roundingMapping,
+                  namesMapping=namesMapping,roundingMapping=roundingMapping,delim_whitespace=delim_whitespace,
                   hexcols=hexcols,auto_find_hexcols=auto_find_hexcols,verbose=verbose,**kwargs)
 
         return(0)
 
     def load(self,filename,raiseError=True,test4commentedheader=False,namesMapping=None,roundingMapping=None,
-             hexcols=None,auto_find_hexcols=True,verbose=False,**kwargs):
+             hexcols=None,auto_find_hexcols=True,verbose=False,delim_whitespace=True,**kwargs):
         #self.t = ascii.read(filename,format='commented_header',delimiter='\s',fill_values=[('-',0),('--',0)])
 
         try:
             if verbose: print('Loading %s' % filename)
-            self.t = pd.read_table(filename,**kwargs)
+            self.t = pd.read_table(filename,delim_whitespace=delim_whitespace,**kwargs)
+            self.filename = filename
         except Exception as e:
             print('ERROR: could not read %s!' % filename)
             if raiseError:
                 raise RuntimeError(str(e))
+            self.filename = None
             return(1)
 
         if test4commentedheader:
@@ -195,14 +277,22 @@ class pdastroclass:
         self.formattable(namesMapping=namesMapping,roundingMapping=roundingMapping,hexcols=hexcols,auto_find_hexcols=auto_find_hexcols)
         return(0)
 
-    def write(self,filename=None,indices=None,columns=None,formatters=None,raiseError=True,overwrite=True,verbose=False,
-              index=False, makepathFlag=True,convert_dtypes=False,hexcols=None, htmlflag=False, **kwargs):
+    def write(self,filename=None,indices=None,columns=None,formatters=None,
+              raiseError=True,overwrite=True,verbose=False, 
+              commentedheader=False,
+              index=False, makepathFlag=True,convert_dtypes=False,
+              hexcols=None,skipcols=None,
+              return_lines=False,
+              htmlflag=False, htmlsortedtable=False, **kwargs):
 
         # make sure indices are converted into a valid list
         indices=self.getindices(indices)
 
         # make sure columns are converted into a valid list
         columns=self.getcolnames(columns)
+        if skipcols is None: skipcols = self.skipcols
+        if len(skipcols)>0:
+            columns=AnotB(columns,skipcols,keeporder=True)
 
         # make the path to the file if necessary
         if not (filename is None):
@@ -225,7 +315,10 @@ class pdastroclass:
                         #print(errorstring)
                         return(2)
                 else:
-                    print('Warning: file exists, not deleting it, skipping! if you want to overwrite, use overwrite option!')
+                    if raiseError:
+                        raise RuntimeError(f'file {filename} already exists! use overwrite option...')
+                    
+                    print(f'Warning: file {filename} already exists, not deleting it, skipping! if you want to overwrite, use overwrite option!')
                     return(0)
 
         # Fix the dtypes if wanted. THIS IS DANGEROUS!!!
@@ -257,24 +350,59 @@ class pdastroclass:
                         formatters[hexcol]='0x{:04x}'.format
 
         if verbose>1 and not(filename is None): print('Saving %d rows into %s' % (len(indices),filename))
+
+        # ugly hack: backwards compatibility to old commented header texttable format:
+        # rename first column temporarily to have a '#'
+        if commentedheader:
+            columns=list(columns)
+            self.t.rename(columns={columns[0]:f'#{columns[0]}'},inplace=True)
+            columns[0]=f'#{columns[0]}'
+
         if len(indices)==0:
+            if columns is None: columns = []
             # just save the header
-            if filename is None:
-                print(' '.join(columns)+'\n')
-            else:
-                if columns is None:
-                    columns = []
-                open(filename,'w').writelines(' '.join(columns)+'\n')
+            lines = [' '.join(columns)+'\n']
         else:
+            if htmlflag:
+                lines = self.t.loc[indices].to_html(index=index, columns=columns, formatters=formatters, **kwargs)
+                if htmlsortedtable:
+                    lines = re.sub('^\<table','<script type="text/javascript" src="sortable.js"></script>\n<table class="sortable" id="anyid" ',lines)
+            else:
+                lines = self.t.loc[indices].to_string(index=index, columns=columns, formatters=formatters, **kwargs)
+        if filename is None:
+            if not return_lines:
+                print(lines)
+        else:
+            open(filename,'w').writelines(lines)
+                
+                
+            """
             if filename is None:
-                print(self.t.loc[indices].to_string(index=index, columns=columns, formatters=formatters, **kwargs))
+                if return_lines:
+                    return(0,self.t.loc[indices].to_string(index=index, columns=columns, formatters=formatters, **kwargs))
+                else:
+                    print(self.t.loc[indices].to_string(index=index, columns=columns, formatters=formatters, **kwargs))
             else:
                 if not htmlflag:
                     self.t.loc[indices].to_string(filename, index=index, columns=columns, formatters=formatters, **kwargs)
                 else:
-                    self.t.loc[indices].to_html(filename, index=index, columns=columns, formatters=formatters, **kwargs)
+                    if htmlsortedtable:
+                        lines = self.t.loc[indices].to_html(index=index, columns=columns, formatters=formatters, **kwargs)
+                        lines = re.sub('^\<table','<script type="text/javascript" src="sortable.js"></script>\n<table class="sortable" id="anyid" ',lines)
+                        f = open(filename,"w")
+                        f.writelines(lines)
+                        f.close()
+                    else:
+                        self.t.loc[indices].to_html(filename, index=index, columns=columns, formatters=formatters, **kwargs)
+                    #self.t.loc[indices].to_html(filename, index=index, columns=columns, formatters=formatters, **kwargs)
+            """
 
-        if not (filename is None):
+        # reverse ugly hack
+        if commentedheader:
+            columns[0]=re.sub('^\#','',columns[0])
+            self.t.rename(columns={"#"+columns[0]:columns[0]},inplace=True)
+
+        if filename is not None:
             # some extra error checking...
             if not os.path.isfile(filename):
                 errorstring='ERROR: could not save %s' % filename
@@ -282,9 +410,11 @@ class pdastroclass:
                     raise RuntimeError(errorstring)
                 #print(errorstring)
                 return(3)
-
-        return(0)
-
+        if return_lines:
+            return(0,lines)
+        else:
+            return(0)
+        
     def formattable(self,namesMapping=None,roundingMapping=None,dtypeMapping=None,hexcols=None,auto_find_hexcols=False):
 
         if not(namesMapping is None):
@@ -367,8 +497,11 @@ class pdastroclass:
                 colnames=[colnames]
         return(colnames)
 
-
     def ix_remove_null(self,colnames=None,indices=None):
+        print('ix_remove_null deprecated, replace with ix_not_null')
+        return(self.ix_not_null(colnames=colnames,indices=indices))
+    
+    def ix_not_null(self,colnames=None,indices=None):
         # get the indices based on input.
         indices=self.getindices(indices)
 
@@ -529,7 +662,7 @@ class pdastroclass:
         return(index)
 
     def fitsheader2table(self,fitsfilecolname,indices=None,requiredfitskeys=None,optionalfitskey=None,
-                         raiseError=True,skipcolname=None,headercol=None,ext=None,extname=None,
+                         raiseError=True,verify='silentfix',skipcolname=None,headercol=None,ext=None,extname=None,
                          prefix=None,suffix=None):
         def fitskey2col(fitskey,prefix=None,suffix=None):
             col = fitskey
@@ -557,7 +690,11 @@ class pdastroclass:
 
         # loop through the images
         for index in indices:
-            header = fits.getheader(self.t.loc[index,fitsfilecolname],ext=ext,extname=extname)
+            #header = fits.getheader(self.t.loc[index,fitsfilecolname],ext=ext,extname=extname)
+            # It was impossible to use 'verify' with getheader... 
+            hdu = fits.open(self.t.loc[index,fitsfilecolname],ext=ext,extname=extname,output_verify="silentfix")
+            if verify is not None: hdu.verify(verify)
+            header = hdu[0].header
             if headercol!=None:
                 self.t[headercol]=header
 
@@ -642,7 +779,144 @@ class pdastroclass:
 
         return(0)
 
+    def radeccols_to_SkyCoord(self,racol=None,deccol=None,indices=None, frame='icrs',
+                              assert_0_360_limits=True,assert_pm90_limits=True):
+        if (racol is None) and (deccol is None):
+            raise RuntimeError('You need to specify at least one of racol or deccol')
+                
+        indices = self.getindices(indices)  
+        for col in [racol,deccol]:
+            if col is None: continue
+            ixs_null = self.ix_is_null(col,indices)
+            if len(ixs_null)>0:
+                self.write(indices=ixs_null)
+                raise RuntimeError(f'Null values for column {col} in above row(s)')
+        
+        if len(indices)==0:
+            print('Warning, trying to assert ra/dec columns are decimal for 0 rows')
+            return([],[])
+        
+        # fill ra and dec
+        ra = np.full(len(indices),np.nan)
+        dec = np.full(len(indices),np.nan)
+        if racol is not None: ra = np.array(self.t.loc[indices,racol])
+        if deccol is not None: dec = np.array(self.t.loc[indices,deccol])
+        
+        # check if all cols are already in numerical format. If yes, all good! This can speed things up!!
+        numflag=True
+        for col in [racol,deccol]:
+            if col is None: continue
+            if not(col in self.t.columns):
+                raise RuntimeError(f'Column {col} is not in columns {self.t.columns}')
+            if not(is_float_dtype(self.t[col]) or is_integer_dtype(self.t[col])):
+                numflag=False
+                
+        if numflag:
+            # no conversion needed!
+            # check ra dec limits if wanted
+            if (ra is not None) and assert_0_360_limits:
+                ra = np.where(ra<0.0,ra+360.0,ra)
+                ra = np.where(ra>=360.0,ra-360.0,ra)
+            if (dec is not None) and assert_pm90_limits:
+                dec = np.where(dec<-90.0,dec+180.0,dec)
+                dec = np.where(dec> 90.0,dec-180.0,dec)
 
+            coord = SkyCoord(ra, dec, frame=frame, unit=(u.deg,u.deg))
+        else:
+            # convert the strings into decimal degrees
+            unit = [u.deg,u.deg]
+
+            check_line_by_line = False
+            # check format of racol if necessary
+            if racol is not None:
+                hexagesimal = unique([(re.search(':',x) is not None) for x in ra])
+                if len(hexagesimal)==1:
+                    # if hexagesimal true, set unit of RA to hourangle!!
+                    if hexagesimal[0]:
+                        unit[0] = u.hourangle
+                elif len(hexagesimal)==2:
+                    # both formats? then check line by line!
+                    print('Warning: it looks like there are inconsistent formats in RA column {racol}! checking line by line for sexagesimal')
+                    check_line_by_line = True
+                else:
+                    raise RuntimeError('Something is wrong here when trying to determine if RA col {racol} is sexagesimal! ')
+
+                        
+            if check_line_by_line:
+                coord = np.full(len(indices),np.nan)
+                hexagesimal = [(re.search(':',x) is not None) for x in ra]
+                raunits=np.where(hexagesimal,u.hourangle,u.deg)
+                for i in range(len(ra)):
+                    coord[i] = SkyCoord(ra[i], dec[i], frame=frame, unit=(raunits[i],u.deg))
+            else:
+                coord = SkyCoord(ra, dec, frame=frame, unit=unit)
+            # no need to check ra dec limits, already done in SkyCoord
+                
+        return(indices,coord)
+
+
+    def assert_radec_cols_decimal_degrees(self,racol=None,deccol=None,
+                                          outracol=None,outdeccol=None,
+                                          indices=None,coordcol=None,
+                                          assert_0_360_limits=True,
+                                          assert_pm90_limits=True):
+        
+        (indices,coord) = self.radeccols_to_SkyCoord(racol=racol,deccol=deccol,indices=indices,
+                                                     assert_0_360_limits=assert_0_360_limits,assert_pm90_limits=assert_pm90_limits)
+
+        if outracol is None: outracol = racol
+        if outdeccol is None: outdeccol = deccol
+        if outracol is not None: self.t.loc[indices,outracol]=coord.ra.degree
+        if outdeccol is not None: self.t.loc[indices,outdeccol]=coord.dec.degree
+        if coordcol is not None: 
+            self.t.loc[indices,coordcol]=coord
+            # Don't write coordcol
+            if not (coordcol in self.skipcols): self.skipcols.append(coordcol)
+                
+        return(0)
+    
+    def assert_radec_cols_sexagesimal(self,racol=None,deccol=None,
+                                      outracol=None,outdeccol=None,
+                                      indices=None,coordcol=None,
+                                      precision=3,
+                                      assert_0_360_limits=True,
+                                      assert_pm90_limits=True):
+        
+        (indices,coord) = self.radeccols_to_SkyCoord(racol=racol,deccol=deccol,indices=indices,
+                                                     assert_0_360_limits=assert_0_360_limits,
+                                                     assert_pm90_limits=assert_pm90_limits)
+
+        if outracol is None: outracol = racol
+        if outdeccol is None: outdeccol = deccol
+
+        # list of ra/dec pairs        
+        hmsdms = map(lambda x: x.split(' '), coord.to_string(sep=':', style='hmsdms', precision=precision))
+        # unzip pairs into a list of ra and a list of dec
+        radeclist = list(zip(*hmsdms))
+
+        if outracol is not None: self.t.loc[indices,outracol]=radeclist[0]
+        if outdeccol is not None: self.t.loc[indices,outdeccol]=radeclist[1]
+        if coordcol is not None: 
+            self.t.loc[indices,coordcol]=coord
+            # Don't write coordcol
+            if not (coordcol in self.skipcols): self.skipcols.append(coordcol)
+                
+        return(0)
+
+
+    def radeccols_to_coord(self,racol,deccol,coordcol,indices=None,
+                           assert_0_360_limits=True,assert_pm90_limits=True):
+        
+        (indices,coord) = self.radeccols_to_SkyCoord(racol=racol,deccol=deccol,indices=indices,
+                                                     assert_0_360_limits=assert_0_360_limits,assert_pm90_limits=assert_pm90_limits)
+
+        self.t.loc[indices,coordcol]=coord
+        # Don't write coordcol
+        if not (coordcol in self.skipcols): self.skipcols.append(coordcol)
+                
+        return(0)
+        
+    
     def flux2mag(self,fluxcol,dfluxcol,magcol,dmagcol,indices=None,
                  zpt=None,zptcol=None, upperlim_Nsigma=None):
 
@@ -660,11 +934,10 @@ class pdastroclass:
             # no upper limits
             indices_ul = indices_ul_negative = []
         else:
-           # calculate the S/N
+            # calculate the S/N
             self.t.loc[indices,'__tmp_SN']=self.t.loc[indices,fluxcol]/self.t.loc[indices,dfluxcol]
             # Get the indices with valid S/N
-            indices_validSN = self.ix_remove_null('__tmp_SN',indices=indices)
-
+            indices_validSN = self.ix_not_null('__tmp_SN',indices=indices)
             # get the indices for which the S/N>=upperlim_Nsigma
             indices_mag = self.ix_inrange(['__tmp_SN'],upperlim_Nsigma,indices=indices_validSN)
             # all the other indices can only be used for upper limits
