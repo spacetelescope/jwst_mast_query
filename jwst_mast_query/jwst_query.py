@@ -18,7 +18,8 @@ from PIL import Image
 
 # pdastroclass is wrapper around pandas.
 from jwst_mast_query.pdastro import pdastroclass,unique,AnotB,AorB,AandB,split_commonpath
-#from pdastro import pdastroclass,unique,AnotB,AorB,AandB,split_commonpath
+
+from jwst_mast_query.utils.constants import MAST_OBS_MODES
 
 # MAST API documentation:
 # https://mast.stsci.edu/api/v0/pyex.html
@@ -232,7 +233,7 @@ class query_mast:
 
 
         parser.add_argument('-i', '--instrument', type=str, default=None, choices=['niriss','nircam','nirspec','miri','fgs'], help='Instrument.  (default=%(default)s)')
-
+        parser.add_argument('--obsmode', type=str, nargs='+', default=[], help='Observing modes. e.g. "imaging, wfss"')
         parser.add_argument('-v','--verbose', default=0, action='count')
         parser.add_argument('--propID', type=int, nargs="+", default=None, help='Search for data for this proposal ID(=APT #) only. If more than one argument: all following arguments are a list of obsnum\'s')
         parser.add_argument('--obsnums', type=int, nargs='+', default=None, help='Search for data in these observation numbers only.')
@@ -334,8 +335,7 @@ class query_mast:
 
             # Make sure propID and obsnums, if they have been entered in the config file,
             # are lists, rather than integers.
-            list_keys = ['propID', 'obsnums']
-            #list_keys = ['obsnums']
+            list_keys = ['propID', 'obsnums', 'obsmode']
             for key in list_keys:
                 if key in self.params.keys():
                     if not isinstance(self.params[key], list):
@@ -508,6 +508,23 @@ class query_mast:
 
 
     def get_mjd_limits(self, lookbacktime=None, date_select=None):
+        """Determine the earliest and latest dates to use for the query
+
+        Parameters
+        ----------
+        lookbacktime : int
+            Number of days before the current date to search
+
+        date_select : str
+            String of starting and stopping dates to use
+
+        Returns
+        -------
+        mjd_min : float
+            MJD of the earliest time to search
+        mjd_max : float
+            MJD of the latest time to search
+        """
         if lookbacktime is None: lookbacktime = self.params['lookbacktime']
 
         if date_select is None: date_select = self.params['date_select']
@@ -540,6 +557,21 @@ class query_mast:
         '''
         Perform query for observations matching JWST instrument and program ID
         that began after a particular date.
+
+        Parameters
+        ----------
+        propID : int
+            Proposal ID number
+        instrument : str
+            Instrument name, e.g. 'nircam'
+        mjd_min : float
+            MJD of the earliest date to search
+        mjd_max : float
+            MJD of the latest date to search
+
+        Returns
+        -------
+        self.obsTable
         '''
 
         if instrument is None:
@@ -557,8 +589,25 @@ class query_mast:
         # To get the list of modes, we can query using Observations, which does support
         # wildcard characters, but returnes only limited information. In this case, we
         # care only about the instrument_name values in the results.
-        inst_list = list(set(Observations.query_criteria(instrument_name=f'{instrument}*',
-                                                         t_min=[mjd_min, mjd_max])['instrument_name']))
+
+        # Check to see if the user entered a list of observing modes. If not, we
+        # query all modes for the instrument via wildcard
+        if len(self.params['obsmode']) == 0:
+            inst_list = list(set(Observations.query_criteria(instrument_name=f'{instrument}*',
+                                                             t_min=[mjd_min, mjd_max])['instrument_name']))
+        else:
+            inst_list = [f'{instrument.upper()}/{mode.upper()}' for mode in self.params['obsmode']]
+
+            # Check against the set of allowed modes, and alert the user to any invalid entries
+            # The MAST search will run without crashing if there is a bad entry. It will simply
+            # ignore the entry.
+            valid_modes = [mode.split('/')[1].lower() for mode in MAST_OBS_MODES[instrument]]
+            for mode in inst_list:
+                if mode not in MAST_OBS_MODES[instrument]:
+                    mode_only = mode.split('/')[1].lower()
+                    print(f'\n\nWARNING: "{mode_only}" is not a valid instrument mode for the MAST search.')
+                    print('This entry will be ignored in the query.')
+                    print(f'Valid {instrument} modes are: {valid_modes}\n\n')
 
         columns = ','.join(self.params['mastcolumns_obsTable'])
         service = self.SERVICES['Caom_search']
