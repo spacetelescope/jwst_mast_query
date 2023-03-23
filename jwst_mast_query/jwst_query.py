@@ -7,6 +7,7 @@ Created on Wed July 28 11:01:23 2021
 """
 from astroquery.mast import Mast, Observations
 from astropy.time import Time
+from copy import deepcopy
 import numpy as np
 import pandas as pd
 #import astropy.io.fits as fits
@@ -233,7 +234,7 @@ class query_mast:
 
 
         parser.add_argument('-i', '--instrument', type=str, default=None, choices=['niriss','nircam','nirspec','miri','fgs'], help='Instrument.  (default=%(default)s)')
-        parser.add_argument('--obsmode', type=str, nargs='+', default=[], help='Observing modes. e.g. "imaging, wfss"')
+        parser.add_argument('--obsmode', type=str, nargs='+', default=None, help='Observing modes. e.g. "imaging, wfss"')
         parser.add_argument('-v','--verbose', default=0, action='count')
         parser.add_argument('--propID', type=int, nargs="+", default=None, help='Search for data for this proposal ID(=APT #) only. If more than one argument: all following arguments are a list of obsnum\'s')
         parser.add_argument('--obsnums', type=int, nargs='+', default=None, help='Search for data in these observation numbers only.')
@@ -333,6 +334,10 @@ class query_mast:
             cfgparams = yaml.load(open(args.configfile,'r'), Loader=yaml.FullLoader)
             self.params.update(cfgparams)
 
+            # If obsmode is None, change to an empty list
+            if self.params['obsmode'] is None:
+                self.params['obsmode'] = []
+
             # Make sure propID and obsnums, if they have been entered in the config file,
             # are lists, rather than integers.
             list_keys = ['propID', 'obsnums', 'obsmode']
@@ -378,8 +383,6 @@ class query_mast:
             if len(self.params['propID'])>1:
                 self.params['obsnums'] = self.params['propID'][1:]
             self.params['propID'] = '%05d' % (int(self.params['propID'][0]))
-        print('propID',self.params['propID'])
-        print('obsnums',self.params['obsnums'])
         self.verbose = self.params['verbose']
 
         if self.verbose>2:
@@ -387,8 +390,10 @@ class query_mast:
             for p in self.params:
                 print(p,self.params[p])
 
-        print('INSTRUMENT:',self.params['instrument'])
-        #sys.exit(0)
+        print('INSTRUMENT: ', self.params['instrument'])
+        print('obsmode: ', self.params['obsmode'])
+        print('propID: ',self.params['propID'])
+        print('obsnums: ',self.params['obsnums'])
 
         return(0)
 
@@ -596,18 +601,26 @@ class query_mast:
             inst_list = list(set(Observations.query_criteria(instrument_name=f'{instrument}*',
                                                              t_min=[mjd_min, mjd_max])['instrument_name']))
         else:
-            inst_list = [f'{instrument.upper()}/{mode.upper()}' for mode in self.params['obsmode']]
+            initial_inst_list = [f'{instrument.upper()}/{mode.upper()}' for mode in self.params['obsmode']]
+            inst_list = deepcopy(initial_inst_list)
 
             # Check against the set of allowed modes, and alert the user to any invalid entries
             # The MAST search will run without crashing if there is a bad entry. It will simply
             # ignore the entry.
             valid_modes = [mode.split('/')[1].lower() for mode in MAST_OBS_MODES[instrument]]
-            for mode in inst_list:
+            for mode in initial_inst_list:
                 if mode not in MAST_OBS_MODES[instrument]:
                     mode_only = mode.split('/')[1].lower()
                     print(f'\n\nWARNING: "{mode_only}" is not a valid instrument mode for the MAST search.')
                     print('This entry will be ignored in the query.')
                     print(f'Valid {instrument} modes are: {valid_modes}\n\n')
+                    inst_list.remove(mode)
+
+            # If all of the user-input obsmodes are invalid, then we fall back to using the wildcard
+            if len(inst_list) == 0:
+                print('All entered modes are invalid. Falling back to query across all possible obsmodes.')
+                inst_list = list(set(Observations.query_criteria(instrument_name=f'{instrument}*',
+                                                             t_min=[mjd_min, mjd_max])['instrument_name']))
 
         columns = ','.join(self.params['mastcolumns_obsTable'])
         service = self.SERVICES['Caom_search']
