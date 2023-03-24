@@ -177,13 +177,13 @@ class query_mast:
 
         # columns returned from MAST to the obsTable
         # These are the default values, they can be changed in the config file
-        self.params['mastcolumns_obsTable']=['proposal_id','dataURL','obsid','obs_id','t_min','t_exptime']
+        self.params['mastcolumns_obsTable']=['proposal_id','dataURL','obsid','obs_id','t_min','t_exptime','instrument_name']
 
         # output columns for the tables. Note that the columns for the individual filetypes
         # are automatically added to the obsTable
         # These are the default values, they can be changed in the config file
         self.params['outcolumns_productTable']=['proposal_id','obsnum','obsID','parent_obsid','obs_id','sca','visit','dataproduct_type','productFilename','filetype','calib_level','size','description']
-        self.params['outcolumns_obsTable']=['proposal_id','obsnum','obsid','obs_id','t_min','t_exptime','date_min']
+        self.params['outcolumns_obsTable']=['proposal_id','obsnum','obsid','obs_id','t_min','t_exptime','date_min','instrument_name']
 
         # The productTable is sorted based on these columns  (can also be set in config file)
         self.params['sortcols_productTable']=['calib_level','filetype','obsID']
