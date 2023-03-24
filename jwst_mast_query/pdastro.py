@@ -18,7 +18,7 @@ from scipy.interpolate import interp1d
 
 def split_commonpath(path1,path2, strip_basenames=False, raiseError=True):
     """
-    compare two paths, and return the common path, and whatever is left from 
+    compare two paths, and return the common path, and whatever is left from
     path1 that is not common
 
     Parameters
@@ -35,7 +35,7 @@ def split_commonpath(path1,path2, strip_basenames=False, raiseError=True):
     if strip_basenames:
         path1 = os.path.basename(path1)
         path2 = os.path.basename(path2)
-        
+
     commonpath = os.path.commonpath([path1,path2])
     if len(commonpath)==0:
         return('',path1)
@@ -62,7 +62,7 @@ def makepath4file(filename,raiseError=True):
         return(makepath(path,raiseError=raiseError))
     else:
         return(0)
-     
+
 def rmfile(filename,raiseError=1,gzip=False):
     " if file exists, remove it "
     if os.path.lexists(filename):
@@ -89,7 +89,7 @@ def rmfiles(filenames,raiseError=1,gzip=False):
         errorflag |= rmfile(filename,raiseError=raiseError,gzip=gzip)
     return(errorflag)
 
-    
+
 #https://numpy.org/doc/stable/reference/routines.set.html
 def AorB(A,B):
     if len(A) == 0:
@@ -191,9 +191,9 @@ class pdastroclass:
         # example:
         # self.default_formatters = {'MJD':'{:.6f}'.format,'counter':'{:05d}'.format}
 
-        # add list of columns to be skipped when using write function 
+        # add list of columns to be skipped when using write function
         self.skipcols = []
-       
+
         # dictionary for the splines. arguments are the y columns of the spline
         self.spline={}
 
@@ -278,7 +278,7 @@ class pdastroclass:
         return(0)
 
     def write(self,filename=None,indices=None,columns=None,formatters=None,
-              raiseError=True,overwrite=True,verbose=False, 
+              raiseError=True,overwrite=True,verbose=False,
               commentedheader=False,
               index=False, makepathFlag=True,convert_dtypes=False,
               hexcols=None,skipcols=None,
@@ -317,7 +317,7 @@ class pdastroclass:
                 else:
                     if raiseError:
                         raise RuntimeError(f'file {filename} already exists! use overwrite option...')
-                    
+
                     print(f'Warning: file {filename} already exists, not deleting it, skipping! if you want to overwrite, use overwrite option!')
                     return(0)
 
@@ -374,8 +374,8 @@ class pdastroclass:
                 print(lines)
         else:
             open(filename,'w').writelines(lines)
-                
-                
+
+
             """
             if filename is None:
                 if return_lines:
@@ -414,7 +414,7 @@ class pdastroclass:
             return(0,lines)
         else:
             return(0)
-        
+
     def formattable(self,namesMapping=None,roundingMapping=None,dtypeMapping=None,hexcols=None,auto_find_hexcols=False):
 
         if not(namesMapping is None):
@@ -500,7 +500,7 @@ class pdastroclass:
     def ix_remove_null(self,colnames=None,indices=None):
         print('ix_remove_null deprecated, replace with ix_not_null')
         return(self.ix_not_null(colnames=colnames,indices=indices))
-    
+
     def ix_not_null(self,colnames=None,indices=None):
         # get the indices based on input.
         indices=self.getindices(indices)
@@ -654,7 +654,8 @@ class pdastroclass:
         return(ix_sorted)
 
     def newrow(self,dicti=None):
-        self.t = self.t.append(dicti,ignore_index=True)
+        row_df = pd.DataFrame(dicti, index=[len(self.t)])
+        self.t = pd.concat([self.t, row_df])
         return(self.t.index.values[-1])
 
     def add2row(self,index,dicti):
@@ -691,7 +692,7 @@ class pdastroclass:
         # loop through the images
         for index in indices:
             #header = fits.getheader(self.t.loc[index,fitsfilecolname],ext=ext,extname=extname)
-            # It was impossible to use 'verify' with getheader... 
+            # It was impossible to use 'verify' with getheader...
             hdu = fits.open(self.t.loc[index,fitsfilecolname],ext=ext,extname=extname,output_verify="silentfix")
             if verify is not None: hdu.verify(verify)
             header = hdu[0].header
@@ -783,25 +784,25 @@ class pdastroclass:
                               assert_0_360_limits=True,assert_pm90_limits=True):
         if (racol is None) and (deccol is None):
             raise RuntimeError('You need to specify at least one of racol or deccol')
-                
-        indices = self.getindices(indices)  
+
+        indices = self.getindices(indices)
         for col in [racol,deccol]:
             if col is None: continue
             ixs_null = self.ix_is_null(col,indices)
             if len(ixs_null)>0:
                 self.write(indices=ixs_null)
                 raise RuntimeError(f'Null values for column {col} in above row(s)')
-        
+
         if len(indices)==0:
             print('Warning, trying to assert ra/dec columns are decimal for 0 rows')
             return([],[])
-        
+
         # fill ra and dec
         ra = np.full(len(indices),np.nan)
         dec = np.full(len(indices),np.nan)
         if racol is not None: ra = np.array(self.t.loc[indices,racol])
         if deccol is not None: dec = np.array(self.t.loc[indices,deccol])
-        
+
         # check if all cols are already in numerical format. If yes, all good! This can speed things up!!
         numflag=True
         for col in [racol,deccol]:
@@ -810,7 +811,7 @@ class pdastroclass:
                 raise RuntimeError(f'Column {col} is not in columns {self.t.columns}')
             if not(is_float_dtype(self.t[col]) or is_integer_dtype(self.t[col])):
                 numflag=False
-                
+
         if numflag:
             # no conversion needed!
             # check ra dec limits if wanted
@@ -841,7 +842,7 @@ class pdastroclass:
                 else:
                     raise RuntimeError('Something is wrong here when trying to determine if RA col {racol} is sexagesimal! ')
 
-                        
+
             if check_line_by_line:
                 coord = np.full(len(indices),np.nan)
                 hexagesimal = [(re.search(':',x) is not None) for x in ra]
@@ -851,7 +852,7 @@ class pdastroclass:
             else:
                 coord = SkyCoord(ra, dec, frame=frame, unit=unit)
             # no need to check ra dec limits, already done in SkyCoord
-                
+
         return(indices,coord)
 
 
@@ -860,7 +861,7 @@ class pdastroclass:
                                           indices=None,coordcol=None,
                                           assert_0_360_limits=True,
                                           assert_pm90_limits=True):
-        
+
         (indices,coord) = self.radeccols_to_SkyCoord(racol=racol,deccol=deccol,indices=indices,
                                                      assert_0_360_limits=assert_0_360_limits,assert_pm90_limits=assert_pm90_limits)
 
@@ -868,20 +869,20 @@ class pdastroclass:
         if outdeccol is None: outdeccol = deccol
         if outracol is not None: self.t.loc[indices,outracol]=coord.ra.degree
         if outdeccol is not None: self.t.loc[indices,outdeccol]=coord.dec.degree
-        if coordcol is not None: 
+        if coordcol is not None:
             self.t.loc[indices,coordcol]=coord
             # Don't write coordcol
             if not (coordcol in self.skipcols): self.skipcols.append(coordcol)
-                
+
         return(0)
-    
+
     def assert_radec_cols_sexagesimal(self,racol=None,deccol=None,
                                       outracol=None,outdeccol=None,
                                       indices=None,coordcol=None,
                                       precision=3,
                                       assert_0_360_limits=True,
                                       assert_pm90_limits=True):
-        
+
         (indices,coord) = self.radeccols_to_SkyCoord(racol=racol,deccol=deccol,indices=indices,
                                                      assert_0_360_limits=assert_0_360_limits,
                                                      assert_pm90_limits=assert_pm90_limits)
@@ -889,34 +890,34 @@ class pdastroclass:
         if outracol is None: outracol = racol
         if outdeccol is None: outdeccol = deccol
 
-        # list of ra/dec pairs        
+        # list of ra/dec pairs
         hmsdms = map(lambda x: x.split(' '), coord.to_string(sep=':', style='hmsdms', precision=precision))
         # unzip pairs into a list of ra and a list of dec
         radeclist = list(zip(*hmsdms))
 
         if outracol is not None: self.t.loc[indices,outracol]=radeclist[0]
         if outdeccol is not None: self.t.loc[indices,outdeccol]=radeclist[1]
-        if coordcol is not None: 
+        if coordcol is not None:
             self.t.loc[indices,coordcol]=coord
             # Don't write coordcol
             if not (coordcol in self.skipcols): self.skipcols.append(coordcol)
-                
+
         return(0)
 
 
     def radeccols_to_coord(self,racol,deccol,coordcol,indices=None,
                            assert_0_360_limits=True,assert_pm90_limits=True):
-        
+
         (indices,coord) = self.radeccols_to_SkyCoord(racol=racol,deccol=deccol,indices=indices,
                                                      assert_0_360_limits=assert_0_360_limits,assert_pm90_limits=assert_pm90_limits)
 
         self.t.loc[indices,coordcol]=coord
         # Don't write coordcol
         if not (coordcol in self.skipcols): self.skipcols.append(coordcol)
-                
+
         return(0)
-        
-    
+
+
     def flux2mag(self,fluxcol,dfluxcol,magcol,dmagcol,indices=None,
                  zpt=None,zptcol=None, upperlim_Nsigma=None):
 

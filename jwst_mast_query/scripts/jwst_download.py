@@ -3,6 +3,7 @@
 """Script that calls the jwst_download.py module. This is the top-level script that users should call.
 It will parse arguments, make tables, query MAST, download files, and create webpages.
 """
+import sys
 from jwst_mast_query import jwst_download as jdl
 
 
