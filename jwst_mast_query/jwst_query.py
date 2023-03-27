@@ -601,7 +601,7 @@ class query_mast:
         # Check to see if the user entered a list of observing modes. If not, we
         # query all modes for the instrument via wildcard
         if self.params['obsmode'][0] is None or len(self.params['obsmode']) == 0:
-            print(f'No obsmode given Querying for all files for {instrument}')
+            print(f'No obsmode given. Querying for all files for {instrument}.')
             inst_list = list(set(Observations.query_criteria(instrument_name=f'{instrument}*',
                                                              t_min=[mjd_min, mjd_max])['instrument_name']))
         else:
