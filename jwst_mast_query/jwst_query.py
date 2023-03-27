@@ -605,8 +605,6 @@ class query_mast:
             inst_list = list(set(Observations.query_criteria(instrument_name=f'{instrument}*',
                                                              t_min=[mjd_min, mjd_max])['instrument_name']))
         else:
-            print(self.params['obsmode'])
-            stop
             initial_inst_list = [f'{instrument.upper()}/{mode.upper()}' for mode in self.params['obsmode']]
             inst_list = deepcopy(initial_inst_list)
 
