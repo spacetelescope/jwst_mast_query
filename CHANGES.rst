@@ -1,3 +1,13 @@
+Unreleased
+==========
+
+MAST Query
+----------
+
+Fix a bug that was resulting in jwst_mast_query seraching for files across all instruments in cases where the intial
+instrument mode search returned an empty string. (#38)
+
+
 0.0.2
 =====
 
