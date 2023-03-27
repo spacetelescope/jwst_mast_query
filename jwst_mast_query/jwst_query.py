@@ -177,36 +177,36 @@ class query_mast:
 
         # columns returned from MAST to the obsTable
         # These are the default values, they can be changed in the config file
-        self.params['mastcolumns_obsTable']=['proposal_id','dataURL','obsid','obs_id','t_min','t_exptime','instrument_name']
+        self.params['mastcolumns_obsTable'] = ['proposal_id','dataURL','obsid','obs_id','t_min','t_exptime','instrument_name']
 
         # output columns for the tables. Note that the columns for the individual filetypes
         # are automatically added to the obsTable
         # These are the default values, they can be changed in the config file
-        self.params['outcolumns_productTable']=['proposal_id','obsnum','obsID','parent_obsid','obs_id','sca','visit','dataproduct_type','productFilename','filetype','calib_level','size','description']
-        self.params['outcolumns_obsTable']=['proposal_id','obsnum','obsid','obs_id','t_min','t_exptime','date_min','instrument_name']
+        self.params['outcolumns_productTable'] = ['proposal_id','obsnum','obsID','parent_obsid','obs_id','sca','visit','dataproduct_type','productFilename','filetype','calib_level','size','description']
+        self.params['outcolumns_obsTable'] = ['proposal_id','obsnum','obsid','obs_id','t_min','t_exptime','date_min','instrument_name']
 
         # The productTable is sorted based on these columns  (can also be set in config file)
-        self.params['sortcols_productTable']=['calib_level','filetype','obsID']
+        self.params['sortcols_productTable'] = ['calib_level','filetype','obsID']
         # The obsTable is sorted based on these columns  (can also be set in config file)
-        self.params['sortcols_obsTable']=['date_min','proposal_id','obsnum']
+        self.params['sortcols_obsTable'] = ['date_min','proposal_id','obsnum']
         # The summary table is sorted based on these columns (can also be set in config file)
-        self.params['sortcols_summaryTable']=['date_start','proposal_id','obsnum']
+        self.params['sortcols_summaryTable'] = ['date_start','proposal_id','obsnum']
 
-        self.params['instrument']='nircam'
-        self.params['filetypes']=['uncal']
-        self.params['guidestars']=False
-        self.params['lookbacktime']=1.0
+        self.params['instrument'] = 'nircam'
+        self.params['obsmode'] = None
+        self.params['filetypes'] = ['uncal']
+        self.params['guidestars'] = False
+        self.params['lookbacktime'] = 1.0
+        self.params['Nobs_per_batch'] = 2
 
+        self.params['skip_propID2outsubdir'] = None
+        self.params['obsnum2outsubdir'] = None
+        self.params['propIDs_obsnum2outsubdir'] = []
+        self.params['jpg_separate_subdir'] = False
 
-        self.params['skip_propID2outsubdir']=None
-        self.params['obsnum2outsubdir']=None
-        self.params['propIDs_obsnum2outsubdir']=[]
-        self.params['jpg_separate_subdir']=False
-
-        self.params['webpage_tablefigsize_width']=100
-        self.params['webpage_tablefigsize_height']=None
-        self.params['webpage_level12_jpgs']=['_uncal.jpg','_dark.jpg','_rate.jpg','_rateints.jpg','_trapsfilled.jpg','_cal.jpg','_crf.jpg']
-
+        self.params['webpage_tablefigsize_width'] = 100
+        self.params['webpage_tablefigsize_height'] = None
+        self.params['webpage_level12_jpgs'] = ['_uncal.jpg','_dark.jpg','_rate.jpg','_rateints.jpg','_trapsfilled.jpg','_cal.jpg','_crf.jpg']
 
 
     def define_options(self,parser=None,usage=None,conflict_handler='resolve'):
@@ -334,13 +334,9 @@ class query_mast:
             cfgparams = yaml.load(open(args.configfile,'r'), Loader=yaml.FullLoader)
             self.params.update(cfgparams)
 
-            # If obsmode is None, change to an empty list
-            if self.params['obsmode'] is None:
-                self.params['obsmode'] = []
-
             # Make sure propID and obsnums, if they have been entered in the config file,
             # are lists, rather than integers.
-            list_keys = ['propID', 'obsnums', 'obsmode']
+            list_keys = ['propID', 'obsnums']
             for key in list_keys:
                 if key in self.params.keys():
                     if not isinstance(self.params[key], list):
@@ -356,6 +352,13 @@ class query_mast:
                 print('\n### CONFIG FILE PARAMETERS:')
                 for p in cfgparams:
                     print('config file args: setting %s to' % (p),cfgparams[p])
+
+        # Make sure obsmode is a list
+        list_keys = ['obsmode']
+        for key in list_keys:
+            if key in self.params.keys():
+                if not isinstance(self.params[key], list):
+                    self.params[key] = [self.params[key]]
 
         # Go through optional parameters.
         # 'None' does not overwrite previously set parameters (either default or config file)
@@ -597,10 +600,13 @@ class query_mast:
 
         # Check to see if the user entered a list of observing modes. If not, we
         # query all modes for the instrument via wildcard
-        if len(self.params['obsmode']) == 0:
+        if self.params['obsmode'][0] is None or len(self.params['obsmode']) == 0:
+            print(f'No obsmode given Querying for all files for {instrument}')
             inst_list = list(set(Observations.query_criteria(instrument_name=f'{instrument}*',
                                                              t_min=[mjd_min, mjd_max])['instrument_name']))
         else:
+            print(self.params['obsmode'])
+            stop
             initial_inst_list = [f'{instrument.upper()}/{mode.upper()}' for mode in self.params['obsmode']]
             inst_list = deepcopy(initial_inst_list)
 
@@ -621,6 +627,10 @@ class query_mast:
                 print('All entered modes are invalid. Falling back to query across all possible obsmodes.')
                 inst_list = list(set(Observations.query_criteria(instrument_name=f'{instrument}*',
                                                              t_min=[mjd_min, mjd_max])['instrument_name']))
+
+        # If inst_list is empty, then there are no observations to query for
+        if len(inst_list) == 0:
+            return(0)
 
         columns = ','.join(self.params['mastcolumns_obsTable'])
         service = self.SERVICES['Caom_search']

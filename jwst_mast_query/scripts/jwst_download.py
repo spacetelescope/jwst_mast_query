@@ -15,7 +15,9 @@ def main():
     # The config file is loaded into self.params, and overwritten with the arguments that are not None
     download.get_arguments(args)
     if download.verbose>2:
-        print('params:', download.params)
+        print('params:')
+        for key, value in download.params.items():
+            print(key, value)
 
     # Use arguments or $API_MAST_TOKEN to login
     download.login(raiseErrorFlag=True)
