@@ -1597,9 +1597,13 @@ class query_mast:
 
         # save the tables if wanted
         if self.params['savetables'] is not None:
-            self.productTable.write(filename=self.params['savetables']+'.selprod.txt',indices=self.ix_selected_products,columns=self.params['outcolumns_productTable'],verbose=2)
-            self.obsTable.write(filename=self.params['savetables']+'.obs.txt',columns=self.params['outcolumns_obsTable'],indices=self.ix_obs_sorted,verbose=2)
-            self.summary.write(filename=self.params['savetables']+'.summary.txt',indices=self.ix_summary_sorted,verbose=2)
+            prodfile = os.path.join(self.outrootdir, self.params['savetables']+'.selprod.txt')
+            obsfile = os.path.join(self.outrootdir, self.params['savetables']+'.obs.txt')
+            summaryfile = os.path.join(self.outrootdir, self.params['savetables']+'.summary.txt')
+
+            self.productTable.write(filename=prodfile, indices=self.ix_selected_products, columns=self.params['outcolumns_productTable'], verbose=2)
+            self.obsTable.write(filename=obsfile, columns=self.params['outcolumns_obsTable'], indices=self.ix_obs_sorted, verbose=2)
+            self.summary.write(filename=summaryfile, indices=self.ix_summary_sorted, verbose=2)
 
         return(0)
 
