@@ -20,7 +20,7 @@ from PIL import Image
 # pdastroclass is wrapper around pandas.
 from jwst_mast_query.pdastro import pdastroclass,unique,AnotB,AorB,AandB,split_commonpath
 
-from jwst_mast_query.utils.constants import MAST_OBS_MODES
+from jwst_mast_query.utils.constants import MAST_OBS_MODES, PARAM_DEFAULTS
 
 # MAST API documentation:
 # https://mast.stsci.edu/api/v0/pyex.html
@@ -164,123 +164,84 @@ class query_mast:
         # indices for summary table, sorted by self.params['sortcols_summaryTable'] (can also be set in config file)
         self.ix_summary_sorted = None
 
-        # columns returned from MAST to the obsTable
-        #self.mastcolumns_obsTable = ['proposal_id','dataURL','obsid','obs_id','t_min','t_exptime']
+        # self.params will be populated from define_options()
+        self.params = deepcopy(PARAM_DEFAULTS)
 
-        # output columns for the tables. Note that the columns for the individual filetypes
-        # are automatically added to the obsTable
-        #self.outcolumns_productTable = ['proposal_id','obsnum','obsID','parent_obsid','obs_id','dataproduct_type','productFilename','filetype','calib_level','size','description']
-        #self.outcolumns_obsTable = ['proposal_id','obsnum','obsid','obs_id','t_min','t_exptime','date_min']
-
-        # self.params will be populated with the arguments
-        self.params = {}
-
-        # columns returned from MAST to the obsTable
-        # These are the default values, they can be changed in the config file
-        self.params['mastcolumns_obsTable'] = ['proposal_id','dataURL','obsid','obs_id','t_min','t_exptime','instrument_name']
-
-        # output columns for the tables. Note that the columns for the individual filetypes
-        # are automatically added to the obsTable
-        # These are the default values, they can be changed in the config file
-        self.params['outcolumns_productTable'] = ['proposal_id','obsnum','obsID','parent_obsid','obs_id','sca','visit','dataproduct_type','productFilename','filetype','calib_level','size','description']
-        self.params['outcolumns_obsTable'] = ['proposal_id','obsnum','obsid','obs_id','t_min','t_exptime','date_min','instrument_name']
-
-        # The productTable is sorted based on these columns  (can also be set in config file)
-        self.params['sortcols_productTable'] = ['calib_level','filetype','obsID']
-        # The obsTable is sorted based on these columns  (can also be set in config file)
-        self.params['sortcols_obsTable'] = ['date_min','proposal_id','obsnum']
-        # The summary table is sorted based on these columns (can also be set in config file)
-        self.params['sortcols_summaryTable'] = ['date_start','proposal_id','obsnum']
-
-        self.params['instrument'] = 'nircam'
-        self.params['obsmode'] = None
-        self.params['filetypes'] = ['uncal']
-        self.params['guidestars'] = False
-        self.params['lookbacktime'] = 1.0
-        self.params['Nobs_per_batch'] = 2
-
-        self.params['skip_propID2outsubdir'] = None
-        self.params['obsnum2outsubdir'] = None
-        self.params['propIDs_obsnum2outsubdir'] = []
-        self.params['jpg_separate_subdir'] = False
-
-        self.params['webpage_tablefigsize_width'] = 100
-        self.params['webpage_tablefigsize_height'] = None
-        self.params['webpage_level12_jpgs'] = ['_uncal.jpg','_dark.jpg','_rate.jpg','_rateints.jpg','_trapsfilled.jpg','_cal.jpg','_crf.jpg']
-
-
-    def define_options(self,parser=None,usage=None,conflict_handler='resolve'):
+    def define_options(self, parser=None, usage=None, conflict_handler='resolve'):
         if parser is None:
-            parser = argparse.ArgumentParser(usage=usage,conflict_handler=conflict_handler)
+            parser = argparse.ArgumentParser(usage=usage, conflict_handler=conflict_handler)
 
-        # default for config file, if available
-        if 'JWST_QUERY_CFGFILE' in os.environ and os.environ['JWST_QUERY_CFGFILE'] != '':
-            cfgfilename = os.environ['JWST_QUERY_CFGFILE']
-        else:
-            cfgfilename = None
+        parser.add_argument('-i', '--instrument', type=str, default=PARAM_DEFAULTS['instrument'], choices=['niriss','nircam','nirspec','miri','fgs'],
+                            help='Instrument.  (default=%(default)s)')
+        parser.add_argument('--obsmode', type=str, nargs='+', default=PARAM_DEFAULTS['obsmode'], help='Observing modes. e.g. "imaging, wfss"')
+        parser.add_argument('-v','--verbose', default=PARAM_DEFAULTS['verbose'], action='count')
+        parser.add_argument('--propID', type=int, nargs="+", default=PARAM_DEFAULTS['propID'], help=('Search for data for this proposal ID only. '
+                                                                                                     'If more than one argument: all following arguments '
+                                                                                                     'are a list of obsnum\'s'))
+        parser.add_argument('--obsnums', type=int, nargs='+', default=PARAM_DEFAULTS['obsnums'], help='Search for data in these observation numbers only.')
+        parser.add_argument('--guidestars', action='store_true', default=PARAM_DEFAULTS['guidestars'], help='Don\'t skip guidestars. By default, they are skipped')
+        parser.add_argument('-f','--filetypes',  type=str, nargs="+", default=PARAM_DEFAULTS['filetypes'], help=(('List of product filetypes to get, e.g., '
+                                                                                                                  '_uncal.fits or _uncal.jpg. If only letters, '
+                                                                                                                  'then _ and .fits are added, for example uncal '
+                                                                                                                  'gets expanded to _uncal.fits. Typical image '
+                                                                                                                  'filetypes are uncal, rate, rateints, cal '
+                                                                                                                  '(default=%(default)s)')))
+        parser.add_argument('--calib_levels',  type=int, nargs="+", default=PARAM_DEFAULTS['calib_levels'], help=(('Only select products with the specified '
+                                                                                                                   'calibration levels (calib_level column in '
+                                                                                                                   'productTable) (default=%(default)s)')))
+        parser.add_argument('--Nobs_per_batch', type=int, default=PARAM_DEFAULTS['Nobs_per_batch'], help=('When querying for products for a given list of '
+                                                                                                          'observations, split into batches of N observations '
+                                                                                                          'per batch. This helps to prevent time outs when '
+                                                                                                          'querying for large lists of products!'))
 
-        # default for config file, if available
-        #if 'JWST_QUERY_OUTDIR' in os.environ and os.environ['JWST_QUERY_OUTDIR'] != '':
-        #    defaultoutdir = os.environ['JWST_QUERY_OUTDIR']
-        #else:
-        #    defaultoutdir = None
-
-
-        # default for token is $MAST_API_TOKEN
-        if 'MAST_API_TOKEN' in os.environ:
-            defaulttoken = os.environ['MAST_API_TOKEN']
-        else:
-            defaulttoken = None
-
-
-        parser.add_argument('-i', '--instrument', type=str, default=None, choices=['niriss','nircam','nirspec','miri','fgs'], help='Instrument.  (default=%(default)s)')
-        parser.add_argument('--obsmode', type=str, nargs='+', default=None, help='Observing modes. e.g. "imaging, wfss"')
-        parser.add_argument('-v','--verbose', default=0, action='count')
-        parser.add_argument('--propID', type=int, nargs="+", default=None, help='Search for data for this proposal ID(=APT #) only. If more than one argument: all following arguments are a list of obsnum\'s')
-        parser.add_argument('--obsnums', type=int, nargs='+', default=None, help='Search for data in these observation numbers only.')
-        parser.add_argument('--guidestars', action='store_true', default=None, help='Don\'t skip guidestars. By default, they are skipped')
-        parser.add_argument('-f','--filetypes',  type=str, nargs="+", default=None, help=('List of product filetypes to get, e.g., _uncal.fits or _uncal.jpg. If only letters, then _ and .fits are added, for example uncal gets expanded to _uncal.fits. Typical image filetypes are uncal, rate, rateints, cal (default=%(default)s)'))
-        parser.add_argument('--calib_levels',  type=int, nargs="+", default=None, help=('Only select products with the specified calibration levels (calib_level column in productTable) (default=%(default)s)'))
-
-        parser.add_argument('--Nobs_per_batch', type=int, default=None, help='When querying for products for a given list of observations, split into batches of N observations per batch. This helps to prevent time outs when querying for large lists of products!')
-
-        parser.add_argument('-c','--configfile', type=str, default=cfgfilename, help='optional config file. default is set to $JWST_QUERY_CFGFILE. Use -vvv to see the full list of all set parameters.')
-        parser.add_argument('--login', default=None, nargs=2, help='username and password for login')
-        parser.add_argument('--token', type=str, default=defaulttoken, help='MAST API token. You can also set the token in the environment variable \$MAST_API_TOKEN')
-
-        parser.add_argument('--outrootdir', default=None, help='output root directory (default=%(default)s)')
-        parser.add_argument('--outsubdir', default=None, help='outsubdir added to output root directory (default=%(default)s)')
-        parser.add_argument('--skip_propID2outsubdir', action='store_true', default=None, help='By default, the APT proposal ID is added as a subdir to the output directory. You can skip this with this option (default=%(default)s)')
-
-        parser.add_argument('--skip_check_if_outfile_exists', action='store_true', default=None, help='Don\'t check if output files exists. This makes it faster for large lists, but files might be reloaded')
-        parser.add_argument('--skip_check_filesize', action='store_true', default=None, help='Don\'t check if output files have the correct filesize. This makes it faster for large lists, but files might be corrupted.')
-
-        parser.add_argument('-e','--obsid_select', nargs="+", default=[], help='Specify obsid range applied to "obsID" and "parent_obsid" columns in the PRODUCT table. If single value, then exact match. If single value has "+" or "-" at the end, then it is a lower and upper limit, respectively. If two values, then range. Examples: 385539+, 385539-, 385539 385600 (default=%(default)s)')
-        parser.add_argument('-l','--obsid_list', nargs="+", default=[], help='Specify list of obsid applied to "obsID" and "parent_obsid" columns in the PRODUCT table. examples: 385539 385600 385530 (default=%(default)s)')
-#        parser.add_argument('--obnum_list', nargs="+", default=[], help='Specify list of obsnum (default=%(default)s)')
-        parser.add_argument('--sca', nargs="+", default=None, choices=['a1','a2','a3','a4','a5','along','b1','b2','b3','b4','b5','blong','guider1','guider2','nrs1','nrs2','mirimage','mirifulong','mirifushort','nis'], help='Specify list of sca\'s to select. a5=along, b5=blong')
+        parser.add_argument('-c','--configfile', type=str, default=PARAM_DEFAULTS['configfile'], help=('optional config file. default is set to $JWST_QUERY_CFGFILE. '
+                                                                                                       'Use -vvv to see the full list of all set parameters.'))
+        parser.add_argument('--login', default=PARAM_DEFAULTS['login'], nargs=2, help='username and password for login')
+        parser.add_argument('--token', type=str, default=PARAM_DEFAULTS['token'], help=('MAST API token. You can also set the token in the environment '
+                                                                                        'variable \$MAST_API_TOKEN'))
+        parser.add_argument('--outrootdir', default=PARAM_DEFAULTS['outrootdir'], help='output root directory (default=%(default)s)')
+        parser.add_argument('--outsubdir', default=PARAM_DEFAULTS['outsubdir'], help='outsubdir added to output root directory (default=%(default)s)')
+        parser.add_argument('--skip_propID2outsubdir', action='store_true', default=PARAM_DEFAULTS['skip_propID2outsubdir'], help=('By default, the APT proposal ID '
+                                                                                                                                   'is added as a subdir to the output '
+                                                                                                                                   'directory. You can skip this with '
+                                                                                                                                   'this option (default=%(default)s)'))
+        parser.add_argument('--skip_check_if_outfile_exists', action='store_true', default=PARAM_DEFAULTS['skip_check_if_outfile_exists'],
+                            help=('Don\'t check if output files exists. This makes it faster for large lists, but files might be reloaded'))
+        parser.add_argument('--skip_check_filesize', action='store_true', default=PARAM_DEFAULTS['skip_check_filesize'], help=('Don\'t check if output files have the '
+                                                                                                                               'correct filesize. This makes it faster '
+                                                                                                                               'for large lists, but files might be '
+                                                                                                                               'corrupted.'))
+        parser.add_argument('-e','--obsid_select', nargs="+", default=PARAM_DEFAULTS['obsid_select'], help=('Specify obsid range applied to "obsID" and "parent_obsid" '
+                                                                                                            'columns in the PRODUCT table. If single value, then exact '
+                                                                                                            'match. If single value has "+" or "-" at the end, then it '
+                                                                                                            'is a lower and upper limit, respectively. If two values, '
+                                                                                                            'then range. Examples: 385539+, 385539-, 385539 385600 '
+                                                                                                            '(default=%(default)s)'))
+        parser.add_argument('-l','--obsid_list', nargs="+", default=PARAM_DEFAULTS['obsid_list'], help=('Specify list of obsid applied to "obsID" and "parent_obsid" '
+                                                                                                        'columns in the PRODUCT table. examples: 385539 385600 385530 '
+                                                                                                        '(default=%(default)s)'))
+        parser.add_argument('--sca', nargs="+", default=PARAM_DEFAULTS['sca'],
+                            choices=['a1','a2','a3','a4','a5','along','b1','b2','b3','b4','b5','blong',
+                                     'guider1','guider2','nrs1','nrs2','mirimage','mirifulong','mirifushort','nis'],
+                                     help='Specify list of sca\'s to select. a5=along, b5=blong')
 
         time_group = parser.add_argument_group("Time constraints for the observation/product search")
-
-        time_group.add_argument('-l', '--lookbacktime', type=float, default=None, help='lookback time in days.')
-#        time_group.add_argument('--mjd_min', type=float, default=None, help='minimum MJD. overrides lookback time.')
-#        time_group.add_argument('--mjd_max', type=float, default=None, help='maximum MJD. overrides lookback time.')
-#        time_group.add_argument('-m', '--mjd_limits', default=None, type=float, nargs=2, help='specify the MJD limits. overrides lookback time and mjd_min/max optional arguments.')
-#        time_group.add_argument('-d', '--date_limits', default=None, type=str, nargs=2, help='specify the date limits (ISOT format). overrides lookback time and mjd* optional arguments.')
-        time_group.add_argument('-d','--date_select', nargs="+", default=[], help='Specify date range (MJD or isot format) applied to "dateobs_center" column. If single value, then exact match. If single value has "+" or "-" at the end, then it is a lower and upper limit, respectively. Examples: 58400+, 58400-,2020-11-23+, 2020-11-23 2020-11-25  (default=%(default)s)')
-
-#        time_group.add_argument('--lre3', action='store_true', default=None, help='Use the LRE-3 date limits. Overrides lookback and mjd* options.')
-#        time_group.add_argument('--lre4', action='store_true', default=None, help='Use the LRE-4 date limits. Overrides lookback and mjd* options.')
-#        time_group.add_argument('--lre5', action='store_true', default=None, help='Use the LRE-5 date limits. Overrides lookback and mjd* options.')
-#        time_group.add_argument('--lre6', action='store_true', default=None, help='Use the LRE-6 date limits. Overrides lookback and mjd* options.')
-
-        parser.add_argument('-s', '--savetables', type=str, default=None, help='save the tables (selected products, obsTable, summary with suffix selprod.txt, obs.txt, summary.txt, respectively) with the specified string as basename (default=%(default)s)')
-        parser.add_argument('-w', '--makewebpages', action='store_true', default=False, help='Make webpages for the products for each propID using the downloaded *jpg files')
-
+        time_group.add_argument('-l', '--lookbacktime', type=float, default=PARAM_DEFAULTS['lookbacktime'], help='lookback time in days.')
+        time_group.add_argument('-d','--date_select', nargs="+", default=PARAM_DEFAULTS['date_select'], help=('Specify date range (MJD or isot format) applied to '
+                                                                                                              '"dateobs_center" column. If single value, then exact '
+                                                                                                              'match. If single value has "+" or "-" at the end, then '
+                                                                                                              'it is a lower and upper limit, respectively. Examples: '
+                                                                                                              '58400+, 58400-,2020-11-23+, 2020-11-23 2020-11-25  '
+                                                                                                              '(default=%(default)s)'))
+        parser.add_argument('-s', '--savetables', type=str, default=PARAM_DEFAULTS['savetables'], help=('save the tables (selected products, obsTable, summary with '
+                                                                                                        'suffix selprod.txt, obs.txt, summary.txt, respectively) with '
+                                                                                                        'the specified string as basename (default=%(default)s)'))
+        parser.add_argument('-w', '--makewebpages', action='store_true', default=PARAM_DEFAULTS['makewebpages'],
+                            help='Make webpages for the products for each propID using the downloaded *jpg files')
 
         return(parser)
 
-    def get_arguments(self, args, configfile = None):
+    def get_arguments(self, args, configfile=None):
         '''
 
         Parameters
@@ -320,14 +281,12 @@ class query_mast:
                                 paramsdict[param] = re.sub(subpattern,envval,paramsdict[param])
                 elif isinstance(paramsdict[param], dict):
                 #elif type(dict[param]) is types.DictType:
-                    # recursive: sub environment variables down the dictiionary
+                    # recursive: sub environment variables down the dictionary
                     subenvvarplaceholder(paramsdict[param])
             return(0)
 
-
         # get the parameters from the config file
         if args.configfile is not None:
-            #cfgparams = yaml.load_file(args.configfile)
             if not os.path.isfile(args.configfile):
                 raise RuntimeError('config file %s does not exist!' % (args.configfile))
             print(f'Loading config file {args.configfile}')
@@ -1142,7 +1101,6 @@ class query_mast:
         if self.outrootdir is None or self.outrootdir == '':
             self.outrootdir = '.'
 
-
         if outsubdir is not None and outsubdir!='':
             self.outrootdir  += f'/{outsubdir}'
         elif self.params['outsubdir'] is not None and self.params['outsubdir']!='':
@@ -1529,7 +1487,7 @@ class query_mast:
         if filetypes is not None:
             self.params['filetypes'] = filetypes
 
-        # get the MJD limits, based on --mjdlimits --lockbacktime --mjdmin --mjdmax --lre3 --lre4 --lre5 --lre6
+        # get the MJD limits, based on --mjdlimits --lockbacktime --mjdmin --mjdmax
         mjd_min, mjd_max = self.get_mjd_limits()
 
         # get the observations: stored in self.obsTable
