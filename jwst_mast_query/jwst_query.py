@@ -172,41 +172,84 @@ class query_mast:
             parser = argparse.ArgumentParser(usage=usage, conflict_handler=conflict_handler)
 
         parser.add_argument('-i', '--instrument', type=str, default=PARAM_DEFAULTS['instrument'], choices=['niriss','nircam','nirspec','miri','fgs'],
-                            help='Instrument.  (default=%(default)s)')
-        parser.add_argument('--obsmode', type=str, nargs='+', default=PARAM_DEFAULTS['obsmode'], help='Observing modes. e.g. "imaging, wfss"')
+                            help='Specify the instrument (nircam, nirspec, niriss, miri, fgs)  (default=%(default)s)')
+        parser.add_argument('--obsmode', type=str, nargs='+', default=PARAM_DEFAULTS['obsmode'], help=('Optionally specify the observation modes to query for. '
+                                                                                                       'If provided, MAST will be queried only for these types of '
+                                                                                                       'observations. e.g. assuming instrument is "nircam", '
+                                                                                                       'obsmode: ["image", "wfss"] will query MAST for NIRCAM/IMAGE '
+                                                                                                       'and NIRCAM/WFSS data. If left empty, the query will include '
+                                                                                                       'all modes. For a list of valid modes, see the example config '
+                                                                                                       'file in the repository. Note that as of 24 March 2023, MAST '
+                                                                                                       'is in the process of reprocessing all data to add the mode '
+                                                                                                       'values to the instrument names. Until this process is '
+                                                                                                       'complete, some older data may not include the mode name, '
+                                                                                                       'and therefore will not be found via a query that includes '
+                                                                                                       'the mode name. (default=%(default)s)'))
         parser.add_argument('-v','--verbose', default=PARAM_DEFAULTS['verbose'], action='count')
-        parser.add_argument('--propID', type=int, nargs="+", default=PARAM_DEFAULTS['propID'], help=('Search for data for this proposal ID only. '
-                                                                                                     'If more than one argument: all following arguments '
-                                                                                                     'are a list of obsnum\'s'))
-        parser.add_argument('--obsnums', type=int, nargs='+', default=PARAM_DEFAULTS['obsnums'], help='Search for data in these observation numbers only.')
-        parser.add_argument('--guidestars', action='store_true', default=PARAM_DEFAULTS['guidestars'], help='Don\'t skip guidestars. By default, they are skipped')
-        parser.add_argument('-f','--filetypes',  type=str, nargs="+", default=PARAM_DEFAULTS['filetypes'], help=(('List of product filetypes to get, e.g., '
-                                                                                                                  '_uncal.fits or _uncal.jpg. If only letters, '
-                                                                                                                  'then _ and .fits are added, for example uncal '
-                                                                                                                  'gets expanded to _uncal.fits. Typical image '
-                                                                                                                  'filetypes are uncal, rate, rateints, cal '
-                                                                                                                  '(default=%(default)s)')))
-        parser.add_argument('--calib_levels',  type=int, nargs="+", default=PARAM_DEFAULTS['calib_levels'], help=(('Only select products with the specified '
+        parser.add_argument('--propID', type=int, nargs="+", default=PARAM_DEFAULTS['propID'], help=('Specify the JWST proposal number to query for. This can be '
+                                                                                                     'a 5 digit integer, or for a smaller number, an integer '
+                                                                                                     'with or without prepended zeros. e.g. 1409 or 01409.'))
+        parser.add_argument('--obsnums', type=int, nargs='+', default=PARAM_DEFAULTS['obsnums'], help=('Specify the observation numbers within the propID. This '
+                                                                                                       'can be a single number, or a bracketed list of numbers. '
+                                                                                                       'e.g. 3 or [3, 103] (default=%(default)s)'))
+        parser.add_argument('--guidestars', action='store_true', default=PARAM_DEFAULTS['guidestars'], help=('If this is set to True, guidestar products are '
+                                                                                                             'also included. Note: there are a **lot** of guide '
+                                                                                                             'star products. We recommend you set to True only if '
+                                                                                                             'really needed! (default=%(default)s)'))
+        parser.add_argument('-f','--filetypes',  type=str, nargs="+", default=PARAM_DEFAULTS['filetypes'], help=('List of file types to select in the product table, '
+                                                                                                                 'e.g., _uncal.fits or _uncal.jpg. If no suffix is '
+                                                                                                                 'given, .fits is appended. If only letters, then _ '
+                                                                                                                 'and .fits are added. For example, "uncal" gets '
+                                                                                                                 'expanded to _uncal.fits. Typical image filetypes '
+                                                                                                                 'are uncal, rate, rateints, cal. For downloading a '
+                                                                                                                 'single file type, the brackets must still surround '
+                                                                                                                 'the file suffix, as the script expects a list. A '
+                                                                                                                 'relatively complete list of options includes: '
+                                                                                                                 '["_segm.fits", "_asn.json", "_pool.csv", "_i2d.jpg", '
+                                                                                                                 '"_thumb.jpg", "_cat.ecsv", "_i2d.fits", "_uncal.fits", '
+                                                                                                                 '"_uncal.jpg", "_cal.fits", "_trapsfilled.fits", '
+                                                                                                                 '"_cal.jpg", "_rate.jpg", "_rateints.jpg", '
+                                                                                                                 '"_trapsfilled.jpg", "_rate.fits", "_rateints.fits"] '
+                                                                                                                 'See the JWST calibration pipeline documentation for '
+                                                                                                                 'a complete list. (default=%(default)s)'))
+        parser.add_argument('--calib_levels',  type=int, nargs="+", default=PARAM_DEFAULTS['calib_levels'], help=('Only select products with the specified '
                                                                                                                    'calibration levels (calib_level column in '
-                                                                                                                   'productTable) (default=%(default)s)')))
-        parser.add_argument('--Nobs_per_batch', type=int, default=PARAM_DEFAULTS['Nobs_per_batch'], help=('When querying for products for a given list of '
-                                                                                                          'observations, split into batches of N observations '
-                                                                                                          'per batch. This helps to prevent time outs when '
-                                                                                                          'querying for large lists of products!'))
-
+                                                                                                                   'productTable) (default=%(default)s)'))
+        parser.add_argument('--Nobs_per_batch', type=int, default=PARAM_DEFAULTS['Nobs_per_batch'], help=('For large programs, the query for the products can time '
+                                                                                                          'out, and in these cases it is better to split up the query '
+                                                                                                          'into Nobs_per_batch observations per batch. For example, '
+                                                                                                          'if there are 22 observations, and Nobs_per_batch=4, then '
+                                                                                                          'there will be 6 batches, 5 batches with 4 observations, '
+                                                                                                          'and the last batch with 2. (default=%(default)s)'))
         parser.add_argument('-c','--configfile', type=str, default=PARAM_DEFAULTS['configfile'], help=('optional config file. default is set to $JWST_QUERY_CFGFILE. '
                                                                                                        'Use -vvv to see the full list of all set parameters.'))
         parser.add_argument('--login', default=PARAM_DEFAULTS['login'], nargs=2, help='username and password for login')
         parser.add_argument('--token', type=str, default=PARAM_DEFAULTS['token'], help=('MAST API token. You can also set the token in the environment '
                                                                                         'variable \$MAST_API_TOKEN'))
-        parser.add_argument('--outrootdir', default=PARAM_DEFAULTS['outrootdir'], help='output root directory (default=%(default)s)')
-        parser.add_argument('--outsubdir', default=PARAM_DEFAULTS['outsubdir'], help='outsubdir added to output root directory (default=%(default)s)')
+        parser.add_argument('--outrootdir', default=PARAM_DEFAULTS['outrootdir'], help=('The base directory for the downloaded products. This can be the name of '
+                                                                                        'an environment variable (such as JWSTDOWNLOAD_OUTDIR), or '
+                                                                                        'a path. Note the preceding "$" in the case where an environment variable is '
+                                                                                        'given. If you include the --outrootdir command line argument when calling '
+                                                                                        'jwst_query.py or jwst_download.py, that value will override any value '
+                                                                                        'provided in the config file. (default=%(default)s)'))
+        parser.add_argument('--outsubdir', default=PARAM_DEFAULTS['outsubdir'], help=('Any additional directory to add to the base directory. This can be used to '
+                                                                                      'customize the organization of the downloaded products. (default=%(default)s)'))
+        parser.add_argument('--obsnum2outsubdir', default=PARAM_DEFAULTS['obsnum2outsubdir'], help=('If True, the observation number will be used to create a '
+                                                                                                    'subdirectory into which the appropriate files will be placed. '
+                                                                                                    'e.g. $JWSTDOWNLOAD_OUTDIR/01410/obsnum23/'))
+        parser.add_argument('--propIDs_obsnum2outsubdir', default=PARAM_DEFAULTS['propIDs_obsnum2outsubdir'], help=('Specify list of propID for which obsnum2outsubdir '
+                                                                                                                    'is True. Only for the listed proposal numbers will '
+                                                                                                                    'observation numbers be used to create a '
+                                                                                                                    'subdirectory into which the appropriate files will '
+                                                                                                                    'be placed. e.g. $JWSTDOWNLOAD_OUTDIR/01410/obsnum23/'))
         parser.add_argument('--skip_propID2outsubdir', action='store_true', default=PARAM_DEFAULTS['skip_propID2outsubdir'], help=('By default, the APT proposal ID '
                                                                                                                                    'is added as a subdir to the output '
                                                                                                                                    'directory. You can skip this with '
                                                                                                                                    'this option (default=%(default)s)'))
         parser.add_argument('--skip_check_if_outfile_exists', action='store_true', default=PARAM_DEFAULTS['skip_check_if_outfile_exists'],
-                            help=('Don\'t check if output files exists. This makes it faster for large lists, but files might be reloaded'))
+                            help=('By default, the script queries MAST for products, and then checks if each file already exists in the output directory or not '
+                                  '("dl_code" and "dl_str" columns). For large numbers of products, this can take time. By setting this option to True, this '
+                                  'check can be skipped. (default=%(default)s)'))
         parser.add_argument('--skip_check_filesize', action='store_true', default=PARAM_DEFAULTS['skip_check_filesize'], help=('Don\'t check if output files have the '
                                                                                                                                'correct filesize. This makes it faster '
                                                                                                                                'for large lists, but files might be '
@@ -224,20 +267,43 @@ class query_mast:
                             choices=['a1','a2','a3','a4','a5','along','b1','b2','b3','b4','b5','blong',
                                      'guider1','guider2','nrs1','nrs2','mirimage','mirifulong','mirifushort','nis'],
                                      help='Specify list of sca\'s to select. a5=along, b5=blong')
+        parser.add_argument('--mastcolumns_obsTable', nargs="+", default=PARAM_DEFAULTS['mastcolumns_obsTable'], help=('Core columns returned from MAST to the obsTable. '
+                                                                                                                       '(default=%(default)s)'))
+        parser.add_argument('--outcolumns_obsTable', nargs="+", default=PARAM_DEFAULTS['outcolumns_obsTable'], help=('Output columns for the obsTable. '
+                                                                                                                     '(default=%(default)s)'))
+        parser.add_argument('--sortcols_obsTable', nargs="+", default=PARAM_DEFAULTS['sortcols_obsTable'], help=('The obsTable is sorted based on these columns. '
+                                                                                                                       'The defaults sort the table in the order the '
+                                                                                                                       'observations were observed. (default=%(default)s)'))
+        parser.add_argument('--outcolumns_productTable', nargs="+", default=PARAM_DEFAULTS['outcolumns_productTable'], help=('List of columns to be shown in product '
+                                                                                                                             'table (default=%(default)s)'))
+        parser.add_argument('--sortcols_productTable', nargs="+", default=PARAM_DEFAULTS['sortcols_productTable'], help=('The productTable is sorted based on these '
+                                                                                                                         'columns. The default sorts the table based '
+                                                                                                                         'on calibration level. (default=%(default)s)'))
+        parser.add_argument('--sortcols_summaryTable', nargs="+", default=PARAM_DEFAULTS['sortcols_summaryTable'], help=('The summary table is sorted based on these '
+                                                                                                                         'columns. The default sorts the table in the '
+                                                                                                                         'order the observations were observed. '
+                                                                                                                         '(default=%(default)s)'))
 
         time_group = parser.add_argument_group("Time constraints for the observation/product search")
-        time_group.add_argument('-l', '--lookbacktime', type=float, default=PARAM_DEFAULTS['lookbacktime'], help='lookback time in days.')
+        time_group.add_argument('-l', '--lookbacktime', type=float, default=PARAM_DEFAULTS['lookbacktime'], help=('Lookback time in days. The script will query MAST '
+                                                                                                                  'over a time from the lookback time to the present '
+                                                                                                                  'moment. Note that all other time parameters '
+                                                                                                                  '(date_select, etc) override the lookback time. '
+                                                                                                                  '(default=%(default)s)'))
         time_group.add_argument('-d','--date_select', nargs="+", default=PARAM_DEFAULTS['date_select'], help=('Specify date range (MJD or isot format) applied to '
                                                                                                               '"dateobs_center" column. If single value, then exact '
                                                                                                               'match. If single value has "+" or "-" at the end, then '
                                                                                                               'it is a lower and upper limit, respectively. Examples: '
                                                                                                               '58400+, 58400-,2020-11-23+, 2020-11-23 2020-11-25  '
                                                                                                               '(default=%(default)s)'))
-        parser.add_argument('-s', '--savetables', type=str, default=PARAM_DEFAULTS['savetables'], help=('save the tables (selected products, obsTable, summary with '
+        parser.add_argument('-s', '--savetables', type=str, default=PARAM_DEFAULTS['savetables'], help=('Save the tables (selected products, obsTable, summary with '
                                                                                                         'suffix selprod.txt, obs.txt, summary.txt, respectively) with '
-                                                                                                        'the specified string as basename (default=%(default)s)'))
+                                                                                                        'the specified string as basename. Tables are saved in the '
+                                                                                                        'same output directory as the data.  If no string is '
+                                                                                                        'provided, the tables are not saved. (default=%(default)s)'))
         parser.add_argument('-w', '--makewebpages', action='store_true', default=PARAM_DEFAULTS['makewebpages'],
-                            help='Make webpages for the products for each propID using the downloaded *jpg files')
+                            help=('Make webpages for the products for each propID containing info and images of the retrieved data. Note that this option is not '
+                                  'currently in the config file, and must be specified at the command line. (default=%(default)s)'))
 
         return(parser)
 
