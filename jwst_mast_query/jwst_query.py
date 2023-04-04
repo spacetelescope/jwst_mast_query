@@ -496,6 +496,12 @@ class query_mast:
 
         if date_select is None: date_select = self.params['date_select']
 
+        # If date_select is a string, split it into a list.
+        # When provided at the command line, date_select is a list.
+        # When provided in cfg file, date_select is a string.
+        if isinstance(date_select, str):
+            date_select = date_select.split(' ')
+
         mjd_min = mjd_max = None
         # parse trailing '+' and '-', and get limits
         limits = getlimits(date_select)
