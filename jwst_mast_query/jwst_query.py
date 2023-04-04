@@ -267,7 +267,7 @@ class query_mast:
 #        time_group.add_argument('--mjd_max', type=float, default=None, help='maximum MJD. overrides lookback time.')
 #        time_group.add_argument('-m', '--mjd_limits', default=None, type=float, nargs=2, help='specify the MJD limits. overrides lookback time and mjd_min/max optional arguments.')
 #        time_group.add_argument('-d', '--date_limits', default=None, type=str, nargs=2, help='specify the date limits (ISOT format). overrides lookback time and mjd* optional arguments.')
-        time_group.add_argument('-d','--date_select', nargs="+", default=[], help='Specify date range (MJD or isot format) applied to "dateobs_center" column. If single value, then exact match. If single value has "+" or "-" at the end, then it is a lower and upper limit, respectively. Examples: 58400+, 58400-,2020-11-23+, 2020-11-23 2020-11-25  (default=%(default)s)')
+        time_group.add_argument('-d','--date_select', nargs="+", default=None, help='Specify date range (MJD or isot format) applied to "dateobs_center" column. If single value, then exact match. If single value has "+" or "-" at the end, then it is a lower and upper limit, respectively. Examples: 58400+, 58400-,2020-11-23+, 2020-11-23 2020-11-25  (default=%(default)s)')
 
 #        time_group.add_argument('--lre3', action='store_true', default=None, help='Use the LRE-3 date limits. Overrides lookback and mjd* options.')
 #        time_group.add_argument('--lre4', action='store_true', default=None, help='Use the LRE-4 date limits. Overrides lookback and mjd* options.')
@@ -536,6 +536,12 @@ class query_mast:
         if lookbacktime is None: lookbacktime = self.params['lookbacktime']
 
         if date_select is None: date_select = self.params['date_select']
+
+        # If date_select is a string, split it into a list.
+        # When provided at the command line, date_select is a list.
+        # When provided in cfg file, date_select is a string.
+        if isinstance(date_select, str):
+            date_select = date_select.split(' ')
 
         mjd_min = mjd_max = None
         # parse trailing '+' and '-', and get limits
