@@ -283,6 +283,8 @@ class query_mast:
                                                                                                                          'columns. The default sorts the table in the '
                                                                                                                          'order the observations were observed. '
                                                                                                                          '(default=%(default)s)'))
+        parser.add_argument('--jpg_separate_subdir', default=PARAM_DEFAULTS['jpg_separate_subdir'], help=('If True, downloaded jpgs are saved in separate "jpg" '
+                                                                                                          'subdirectories, along side the fits files. (default=%(default)s)'))
 
         time_group = parser.add_argument_group("Time constraints for the observation/product search")
         time_group.add_argument('-l', '--lookbacktime', type=float, default=PARAM_DEFAULTS['lookbacktime'], help=('Lookback time in days. The script will query MAST '
@@ -304,6 +306,35 @@ class query_mast:
         parser.add_argument('-w', '--makewebpages', action='store_true', default=PARAM_DEFAULTS['makewebpages'],
                             help=('Make webpages for the products for each propID containing info and images of the retrieved data. Note that this option is not '
                                   'currently in the config file, and must be specified at the command line. (default=%(default)s)'))
+        parser.add_argument('--webpage_tablefigsize_width', default=PARAM_DEFAULTS['webpage_tablefigsize_width'], help=("Width in pixels of the resized jpg images "
+                                                                                                                        "to be inserted into the index.html summary file."
+                                                                                                                        "Recommended: 100-150, or don't specify if "
+                                                                                                                        "webpage_mkthumbnails, since then the size of "
+                                                                                                                        "the thumbnails are used by default. "
+                                                                                                                        "(default=%(default)s)"))
+        parser.add_argument('--webpage_tablefigsize_height', default=PARAM_DEFAULTS['webpage_tablefigsize_height'], help=("Height in pixels of the resized jpg images "
+                                                                                                                          "to be inserted into the index.html summary "
+                                                                                                                          "file. If left undefined, the height will be "
+                                                                                                                          "determined from webpage_thumbnail_width and "
+                                                                                                                          "the aspect ratio of the original image.  "
+                                                                                                                          "(default=%(default)s)"))
+        parser.add_argument('--webpage_level12_jpgs', nargs="+", default=PARAM_DEFAULTS['webpage_level12_jpgs'], help=('List of filetypes whose thumbnails will be shown in '
+                                                                                                            'index.html. (default=%(default)s)'))
+        parser.add_argument('--webpage_fitskeys2table', nargs="+", default=PARAM_DEFAULTS['webpage_fitskeys2table'], help=('List of fits header keywords that should '
+                                                                                                                           'be copied to the table. (default=%(default)s)') )
+        parser.add_argument('--webpage_cols4table', nargs="+", default=PARAM_DEFAULTS['webpage_cols4table'], help=('Columns to be shown in index.html. (default=%(default)s)'))
+        parser.add_argument('--webpage_sortcols', nargs="+", default=PARAM_DEFAULTS['webpage_sortcols'], help=('Columns to sort index.html by. (default=%(default)s)'))
+        parser.add_argument('--webpage_mkthumbnails', default=PARAM_DEFAULTS['webpage_mkthumbnails'], help=('If True, a thumbnail jpg is created for each of the '
+                                                                                                            'jpg products listed in webpage_level12_jpgs. '
+                                                                                                            '(default=%(default)s)'))
+        parser.add_argument('--webpage_thumbnails_overwrite', default=PARAM_DEFAULTS['webpage_thumbnails_overwrite'], help=('If True, remake thumbnails even if they '
+                                                                                                                            'already exist (default=%(default)s)'))
+        parser.add_argument('--webpage_thumbnails_width', default=PARAM_DEFAULTS['webpage_thumbnails_width'], help=('Width in pixels of the resized jpg images '
+                                                                                                                    'to be inserted into the index.html summary '
+                                                                                                                    'file. (default=%(default)s)'))
+        parser.add_argument('--webpage_thumbnails_height', default=PARAM_DEFAULTS['webpage_thumbnails_height'], help=('Height in pixels of the resized jpg images '
+                                                                                                                      'to be inserted into the index.html summary '
+                                                                                                                      'file. (default=%(default)s)'))
 
         return(parser)
 
@@ -1512,7 +1543,7 @@ class query_mast:
 
         # Make sure sortable.js is in the html directory
         htmldir = os.path.dirname(htmlname)
-        jsfilename = f'{os.path.dirname(os.path.realpath(sys.argv[0]))}/sortable.js'
+        jsfilename = os.path.join(os.path.realpath(os.path.dirname(os.path.join('../', __file__))), 'sortable.js')
         dest_jsfilename = f'{htmldir}/sortable.js'
         if not os.path.isfile(dest_jsfilename):
             if not os.path.isfile(jsfilename):

@@ -54,8 +54,19 @@ PARAM_DEFAULTS = {'mastcolumns_obsTable': ['proposal_id','dataURL','obsid','obs_
                   'skip_check_if_outfile_exists': False,
                   'skip_check_filesize': False,
                   'jpg_separate_subdir': False,
-                  'webpage_tablefigsize_width': 100,
+                  'webpage_tablefigsize_width': None,
                   'webpage_tablefigsize_height': None,
-                  'webpage_level12_jpgs': ['_uncal.jpg','_dark.jpg','_rate.jpg','_rateints.jpg','_trapsfilled.jpg','_cal.jpg','_crf.jpg'],
+                  'webpage_level12_jpgs': ['_uncal.jpg', '_dark.jpg', '_rate.jpg', '_rateints.jpg', '_trapsfilled.jpg', '_cal.jpg', '_crf.jpg'],
+                  'webpage_fitskeys2table': ['TARG_RA', 'TARG_DEC', 'FILTER', 'PUPIL', 'READPATT', 'NINTS', 'NGROUPS', 'NFRAMES', 'DATE-BEG',
+                                             'DATE-END', 'EFFINTTM', 'EFFEXPTM'],
+                  'webpage_cols4table': ['proposal_id', 'obsnum', 'visit', 'obsID', 'parent_obsid', 'sca', 'FILTER', 'PUPIL', 'READPATT', 'uncal',
+                                         'dark', 'rate', 'rateints', 'cal', 'TARG_RA', 'TARG_DEC', 'NINTS', 'NGROUPS', 'NFRAMES', 'DATE-BEG', 'DATE-END',
+                                         'EFFINTTM', 'EFFEXPTM', 'size', 'obs_id', 'outfilename'],
+                  'webpage_sortcols': ['proposal_id', 'obsnum', 'visit', 'sca'],
+                  'webpage_mkthumbnails': True,
+                  'webpage_thumbnails_overwrite': False,
+                  'webpage_thumbnails_width': 120,
+                  'webpage_thumbnails_height': None,
+
                   'login': None
                   }
