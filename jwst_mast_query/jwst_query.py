@@ -1524,11 +1524,17 @@ class query_mast:
 
         outcols4html = self.params['webpage_cols4table']
 
-        # make the ascci table(without the jpg cols), and save it
+        # Make the ascci table(without the jpg cols), and save it.
+        # Use a try/except to insulate against the case where requested suffixes for download in webpage_level12_jpgs
+        # are not included in webpage_cols4table
         outcols4ascci = copy.deepcopy(outcols4html)
         for figcol in figcols:
-            outcols4ascci.remove(figcol)
-        print(f'writing {description} pandas ascii to {asciiname}')
+            try:
+                outcols4ascci.remove(figcol)
+            except ValueError:
+                pass
+        print(f'Writing {description} pandas ascii to {asciiname}')
+        print(outcols4ascci)
         productTable.write(filename=asciiname, indices=ixs_uncal, columns=outcols4ascci)
 
         # write the table to index.html
