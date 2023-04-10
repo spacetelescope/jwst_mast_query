@@ -55,7 +55,7 @@ Below we show an example of a typical call to **jwsst_download.py**, with a few 
 
 - --obsnums : Optional observation number or numbers within propID to retrieve. e.g. `--obsnums 3 103` would retrieve files only from observations 3 and 103.
 
-- --makewebpages : Make webpages for the products for each propID containing info and images of the retrieved data. Note that this option is not currently in the config file, and must be specified at the command line.
+- --makewebpages : Make webpages for the products for each propID containing info and images of the retrieved data.
 
 
 These are just a few of the options that can be set. The rest are specified in the config file provided in the call. Config file details are given below.
