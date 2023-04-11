@@ -335,6 +335,7 @@ class query_mast:
         parser.add_argument('--webpage_thumbnails_height', default=PARAM_DEFAULTS['webpage_thumbnails_height'], help=('Height in pixels of the resized jpg images '
                                                                                                                       'to be inserted into the index.html summary '
                                                                                                                       'file. (default=%(default)s)'))
+        parser.add_argument('--skipdownload', action='store_true', default=PARAM_DEFAULTS['skipdownload'], help='If set, no files will be downloaded. (default=%(default)s)')
 
         return(parser)
 
@@ -390,26 +391,28 @@ class query_mast:
             cfgparams = yaml.load(open(args.configfile,'r'), Loader=yaml.FullLoader)
             self.params.update(cfgparams)
 
-            # Make sure propID and obsnums, if they have been entered in the config file,
-            # are lists, rather than integers.
-            list_keys = ['propID', 'obsnums']
-            for key in list_keys:
-                if key in self.params.keys():
-                    if not isinstance(self.params[key], list):
-                        self.params[key] = [self.params[key]]
-
-            # Ensure that the propID is a 5-digit string
-            if 'propID' in self.params.keys():
-                self.params['propID'] = ['%05d' % (int(self.params['propID'][0]))]
-
-            subenvvarplaceholder(self.params)
-
             if args.verbose>2:
                 print('\n### CONFIG FILE PARAMETERS:')
                 for p in cfgparams:
                     print('config file args: setting %s to' % (p),cfgparams[p])
 
-        # Make sure obsmode is a list
+            # Make sure propID and obsnums, if they have been entered in the config file,
+            # are lists, rather than integers. When entered via command line, they are
+            # guaranteed to be lists.
+            list_keys = ['propID', 'obsnums']
+            for key in list_keys:
+                if key in self.params.keys():
+                    if not isinstance(self.params[key], list) and self.params[key] is not None:
+                        self.params[key] = [self.params[key]]
+
+            # Ensure that the propID is a 5-digit string
+            if 'propID' in self.params.keys():
+                if self.params['propID'] is not None:
+                    self.params['propID'] = ['%05d' % (int(self.params['propID'][0]))]
+
+        subenvvarplaceholder(self.params)
+
+        # Make sure obsmode is a list, even if it's just [None]
         list_keys = ['obsmode']
         for key in list_keys:
             if key in self.params.keys():
@@ -426,7 +429,7 @@ class query_mast:
             # skip config file
             if arg=='configfile': continue
 
-            if argsdict[arg] is not None:
+            if argsdict[arg] is not None and argsdict[arg] != []:
                 if args.verbose>2:
                     print('optional args: setting %s to %s' % (arg,argsdict[arg]))
                 self.params[arg]=argsdict[arg]

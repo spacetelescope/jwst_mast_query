@@ -67,6 +67,6 @@ PARAM_DEFAULTS = {'mastcolumns_obsTable': ['proposal_id','dataURL','obsid','obs_
                   'webpage_thumbnails_overwrite': False,
                   'webpage_thumbnails_width': 120,
                   'webpage_thumbnails_height': None,
-
-                  'login': None
+                  'login': None,
+                  'skipdownload': False
                   }
