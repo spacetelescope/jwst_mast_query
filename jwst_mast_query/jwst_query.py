@@ -295,7 +295,8 @@ class query_mast:
         time_group.add_argument('-d','--date_select', nargs="+", default=PARAM_DEFAULTS['date_select'], help=('Specify date range (MJD or isot format) applied to '
                                                                                                               '"dateobs_center" column. If single value, then exact '
                                                                                                               'match. If single value has "+" or "-" at the end, then '
-                                                                                                              'it is a lower and upper limit, respectively. Examples: '
+                                                                                                              'it is a lower and upper limit, respectively. date_select '
+                                                                                                              'will override the lookbacktime. Examples: '
                                                                                                               '58400+, 58400-,2020-11-23+, 2020-11-23 2020-11-25  '
                                                                                                               '(default=%(default)s)'))
         parser.add_argument('-s', '--savetables', type=str, default=PARAM_DEFAULTS['savetables'], help=('Save the tables (selected products, obsTable, summary with '
