@@ -391,6 +391,7 @@ class query_mast:
             print(f'Loading config file {args.configfile}')
             cfgparams = yaml.load(open(args.configfile,'r'), Loader=yaml.FullLoader)
             self.params.update(cfgparams)
+            self.params['configfile'] = args.configfile
 
             if args.verbose>2:
                 print('\n### CONFIG FILE PARAMETERS:')
@@ -451,7 +452,7 @@ class query_mast:
         if self.verbose>2:
             print('\n### FINAL PARAMETERS:')
             for p in self.params:
-                print(p,self.params[p])
+                print(f'{p}: {self.params[p]}')
 
         print('INSTRUMENT: ', self.params['instrument'])
         print('obsmode: ', self.params['obsmode'])
