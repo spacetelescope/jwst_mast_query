@@ -941,8 +941,12 @@ class query_mast:
                           "format":"json"
                           }
                 tmptable = self.JwstObs.service_request(service, params).to_pandas()
+
+                # Remove duplicate rows based on the productFilename value
+                tmptable.drop_duplicates(subset='productFilename', keep='first', inplace=True, ignore_index=True)
+
                 if self.verbose:
-                    print(f'{len(tmptable)} products found for this chunk of observations')
+                    print(f'After filtering duplicate entries, {len(tmptable)} products found for this chunk of observations')
                 tmptables.append(tmptable)
             self.productTable.t = pd.concat(tmptables, axis=0, ignore_index=True)
         else:
