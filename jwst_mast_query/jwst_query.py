@@ -948,7 +948,11 @@ class query_mast:
                 if self.verbose:
                     print(f'After filtering duplicate entries, {len(tmptable)} products found for this chunk of observations')
                 tmptables.append(tmptable)
+
             self.productTable.t = pd.concat(tmptables, axis=0, ignore_index=True)
+
+            # Remove duplicate rows that come from different queries
+            self.productTable.t.drop_duplicates(subset='productFilename', keep='first', inplace=True, ignore_index=True)
         else:
             params = {"obsid":obsids,
                       "columns":['type','productType'],
