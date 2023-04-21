@@ -941,10 +941,18 @@ class query_mast:
                           "format":"json"
                           }
                 tmptable = self.JwstObs.service_request(service, params).to_pandas()
+
+                # Remove duplicate rows based on the productFilename value
+                tmptable.drop_duplicates(subset='productFilename', keep='first', inplace=True, ignore_index=True)
+
                 if self.verbose:
-                    print(f'{len(tmptable)} products found for this chunk of observations')
+                    print(f'After filtering duplicate entries, {len(tmptable)} products found for this chunk of observations')
                 tmptables.append(tmptable)
+
             self.productTable.t = pd.concat(tmptables, axis=0, ignore_index=True)
+
+            # Remove duplicate rows that come from different queries
+            self.productTable.t.drop_duplicates(subset='productFilename', keep='first', inplace=True, ignore_index=True)
         else:
             params = {"obsid":obsids,
                       "columns":['type','productType'],
@@ -1615,14 +1623,12 @@ class query_mast:
         if self.verbose>1:
             print(self.obsTable.t)
 
-
         # get the products:  stored in self.productTable
         # this list contains in general several entries for each observations.
         # If not otherwise specified, uses self.obsTable as starting point
         self.product_query(Nobs_per_batch=self.params['Nobs_per_batch'])
         if self.verbose>1:
             print(self.productTable.t)
-            #print(self.productTable.columns)
 
         # select the products to download
         # If not otherwise specified, uses self.productTable as starting point
@@ -1643,7 +1649,7 @@ class query_mast:
         # only keep entries in the obstable that are parent_obsid in product table
         self.ix_obs_sorted = self.update_obstable_indices(self.ix_selected_products)
 
-        # definte the output filenames, and check if they exist.
+        # define the output filenames, and check if they exist.
         self.mk_outfilenames(skip_propID2outsubdir=self.params['skip_propID2outsubdir'],
                              obsnum2outsubdir=self.params['obsnum2outsubdir'],
                              jpg_separate_subdir=self.params['jpg_separate_subdir'],
@@ -1656,7 +1662,7 @@ class query_mast:
         # print the table to screen if either verbose or not downloading
         if showtables:
             print('\n######################\n### Selected Products:\n######################')
-            self.productTable.write(indices=self.ix_selected_products,columns=self.params['outcolumns_productTable'])
+            self.productTable.write(indices=self.ix_selected_products, columns=self.params['outcolumns_productTable'])
 
             print('\n#################\n### Observations:\n#################')
             self.obsTable.write(columns=self.params['outcolumns_obsTable'],indices=self.ix_obs_sorted)
