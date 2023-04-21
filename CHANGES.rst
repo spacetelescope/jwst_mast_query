@@ -1,11 +1,27 @@
-Unreleased
-==========
+0.0.3
+=====
+
+Config File
+-----------
+
+Fix a bug that was preventing the date_select values in the cfg file from being used. (#39)
+
+Make documentation and default parameter values consistent between the config file and the code. Add missing parameters to the config file (propID, obsnums). (#41)
+
 
 MAST Query
 ----------
 
 Fix a bug that was resulting in jwst_mast_query seraching for files across all instruments in cases where the intial
 instrument mode search returned an empty string. (#38)
+
+Remove repeated copies of a given filename from the output tables and download list. (#45)
+
+
+Outputs
+-------
+
+Save the product tables into outrootdir, rather than the current working directory. (#40)
 
 
 0.0.2
