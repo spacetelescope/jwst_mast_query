@@ -86,7 +86,8 @@ setup(
         'pandas',
         'pyyaml',
         'scipy',
-        'argparse'
+        'argparse',
+        'pillow'
     ],
     scripts=['jwst_mast_query/scripts/jwst_download.py'],
     include_package_data=True,
