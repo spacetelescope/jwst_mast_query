@@ -38,7 +38,7 @@ PARAM_DEFAULTS = {'mastcolumns_obsTable': ['proposal_id','dataURL','obsid','obs_
                   'obsid_list': [],
                   'sca': None,
                   'verbose': 0,
-                  'filetypes': ['uncal'],
+                  'filetypes': ['fits'],
                   'guidestars': False,
                   'lookbacktime': 1.,
                   'calib_levels': None,
