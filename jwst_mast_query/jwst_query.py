@@ -431,7 +431,7 @@ class query_mast:
             # skip config file
             if arg=='configfile': continue
 
-            if argsdict[arg] is not None and argsdict[arg] != []:
+            if argsdict[arg] != PARAM_DEFAULTS[arg]:
                 if args.verbose>2:
                     print('optional args: setting %s to %s' % (arg,argsdict[arg]))
                 self.params[arg]=argsdict[arg]
