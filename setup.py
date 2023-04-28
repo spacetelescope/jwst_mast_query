@@ -87,7 +87,8 @@ setup(
         'pyyaml',
         'scipy',
         'argparse',
-        'pillow'
+        'pillow',
+        'pytest'
     ],
     scripts=['jwst_mast_query/scripts/jwst_download.py'],
     include_package_data=True,
