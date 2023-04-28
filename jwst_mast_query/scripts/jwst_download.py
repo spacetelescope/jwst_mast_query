@@ -30,7 +30,7 @@ def main():
     if download.mk_all_tables(showtables=True):
         sys.exit(0)
 
-    if not args.skipdownload and len(download.ix_selected_products)>0:
+    if not download.params['skipdownload'] and len(download.ix_selected_products)>0:
         download.download_products()
         print('\n######################\n### Downloaded Selected Products:\n######################')
         download.productTable.write(indices=download.ix_selected_products,columns=download.params['outcolumns_productTable'])
@@ -40,7 +40,7 @@ def main():
             sys.exit(0)
 
     # Make the webpages
-    if args.makewebpages:
+    if download.params['makewebpages']:
         download.mk_webpages4propIDs()
 
 
