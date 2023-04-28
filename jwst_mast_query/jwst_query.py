@@ -336,8 +336,6 @@ class query_mast:
         parser.add_argument('--webpage_thumbnails_height', default=PARAM_DEFAULTS['webpage_thumbnails_height'], help=('Height in pixels of the resized jpg images '
                                                                                                                       'to be inserted into the index.html summary '
                                                                                                                       'file. (default=%(default)s)'))
-        #parser.add_argument('--skipdownload', action='store_true', default=PARAM_DEFAULTS['skipdownload'], help='If set, no files will be downloaded. (default=%(default)s)')
-
         return(parser)
 
     def get_arguments(self, args, configfile=None):
