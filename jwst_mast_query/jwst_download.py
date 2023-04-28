@@ -16,6 +16,7 @@ from astropy.utils.data import download_file
 
 from jwst_mast_query.jwst_query import query_mast
 from jwst_mast_query.pdastro import makepath4file,AnotB
+from jwst_mast_query.utils.constants import PARAM_DEFAULTS
 #from pdastro import makepath4file,AnotB
 
 
@@ -62,10 +63,12 @@ class download_mast(query_mast):
         #    outrootdir = '.'
         #print('Default output rootdir: %s' % outrootdir)
 
-        parser.add_argument('-n','--skipdownload', action='store_true', default=False, help='skip downloading the data.  (default=%(default)s)')
+        parser.add_argument('-n','--skipdownload', action='store_true', default=PARAM_DEFAULTS['skipdownload'],
+                            help='skip downloading the data.  (default=%(default)s)')
 #        parser.add_argument('-o','--outrootdir', default=outrootdir, help=('output root directory. (default=%(default)s)'))
 #        parser.add_argument('--outsubdir', default=None, help=('subdir added to the output root directory. If None, then propID is used (default=%(default)s)'))
-        parser.add_argument('--clobber', action='store_true', default=None, help='existing files are overwritten, otherwise they are skipped (default=%(default)s)')
+        parser.add_argument('--clobber', action='store_true', default=PARAM_DEFAULTS['clobber'],
+                            help='existing files are overwritten, otherwise they are skipped (default=%(default)s)')
 
         return(parser)
 
