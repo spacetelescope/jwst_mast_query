@@ -1,3 +1,17 @@
+0.0.4
+=====
+
+Config File
+-----------
+
+Fix a bug that was causing parameters with default values other than None or [] to be set back to the default value after adjusting parameter values based on the contents of the config file. (#51)
+
+Environment
+-----------
+
+Add pillow as a dependency in setup.py, so that it is downloaded upon installation of jwst_mast_query. (#49)
+
+
 0.0.3
 =====
 
