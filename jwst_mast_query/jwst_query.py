@@ -908,16 +908,9 @@ class query_mast:
         Perform query for data products based on obs_id's in observation table
         '''
         Nobs_per_batch = self.params['Nobs_per_batch']
-        #guidestars = self.params['guidestars']
 
         if obsTable is None:
             obsTable=self.obsTable
-
-        #if guidestars is None:
-        #    guidestars = self.params['guidestars']
-        #    if guidestars is None:
-        #        guidestars = False
-
 
         # query MAST for all products for the obsid's
         obsids = ','.join(obsTable.t['obsid'].astype('str'))
@@ -967,16 +960,6 @@ class query_mast:
         #self.productTable.write()
         if self.verbose:
             print(f'productTable obtained with {len(self.productTable.t)} entries')
-
-        # remove guide stars if wanted...THIS IS DONE IN PRODUCT_FILTER()
-        #if not guidestars:
-        #    ixs_products = self.productTable.getindices()
-        #    gs_text = '_gs-'
-        #    ixs_gs = self.productTable.ix_matchregex('productFilename',gs_text)
-        #    ixs_keep_products = AnotB(ixs_products,ixs_gs)
-        #    self.productTable.t=self.productTable.t.loc[ixs_keep_products].reset_index()
-        #    if self.verbose:
-        #        print('Removing %d guide star products from a total of %d products, %d left' % (len(ixs_gs),len(ixs_products),len(ixs_keep_products)))
 
         # Fill the suffix column with the suffix of the form _bla1.bla2, e.g. _uncal.fits
         # This will later be used to figure out
@@ -1060,24 +1043,6 @@ class query_mast:
 
             print('allowed filetype list:',filetypes)
 
-
-
-
-        ####FOR TESTING
-        print(f'guidestars is {self.params["guidestars"]}')
-        gs_text = '_gs-'
-        ixs_gs = self.productTable.ix_matchregex('productFilename',gs_text)
-        print(len(ixs_gs))
-        for iddx in ixs_gs:
-            print(self.productTable.t.loc[iddx]['productFilename'])
-        print('Guide star files are present here, as expected')
-        #######FOR TESTING
-
-
-
-
-
-
         ix_products = self.productTable.getindices()
         if not self.params['guidestars'] and not self.params['guidestar_data_only']:
             # If both guidestars and guidestar_data_only are False, filter out guide star products
@@ -1129,24 +1094,6 @@ class query_mast:
         self.params['filetypes'] = unique(self.productTable.t.loc[self.ix_selected_products,'filetype'])
 
         self.ix_selected_products = self.productTable.ix_sort_by_cols(self.params['sortcols_productTable'],indices=self.ix_selected_products)
-
-
-
-
-        ####FOR TESTING
-        print(f'guidestars is {self.params["guidestars"]}')
-        gs_text = '_gs-'
-        temptable = self.productTable.t.loc[self.ix_selected_products]
-        #ixs_gs = temptable.ix_matchregex('productFilename',gs_text)
-        print(len(ixs_gs))
-        print(temptable)
-        print('Are Guide star files are present here, as expected?')
-        #stop
-        #######FOR TESTING
-
-
-
-
 
         return(self.ix_selected_products)
 
