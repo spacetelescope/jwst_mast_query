@@ -196,6 +196,9 @@ class query_mast:
                                                                                                              'also included. Note: there are a **lot** of guide '
                                                                                                              'star products. We recommend you set to True only if '
                                                                                                              'really needed! (default=%(default)s)'))
+        parser.add_argument('--guidestar_data_only', action='store_true', default=PARAM_DEFAULTS['guidestar_data_only'], help=('If this is set to True, only guidestar '
+                                                                                                                               'products are included. No science data '
+                                                                                                                               'will be included. (default=%(default)s)'))
         parser.add_argument('-f','--filetypes',  type=str, nargs="+", default=PARAM_DEFAULTS['filetypes'], help=('List of file types to select in the product table, '
                                                                                                                  'e.g., _uncal.fits or _uncal.jpg. If no suffix is '
                                                                                                                  'given, .fits is appended. If only letters, then _ '
@@ -900,18 +903,20 @@ class query_mast:
 
         return self.productTable
 
-    def product_query(self, obsTable=None, guidestars=None, Nobs_per_batch=2):
+    def product_query(self, obsTable=None):
         '''
         Perform query for data products based on obs_id's in observation table
         '''
+        Nobs_per_batch = self.params['Nobs_per_batch']
+        #guidestars = self.params['guidestars']
 
         if obsTable is None:
             obsTable=self.obsTable
 
-        if guidestars is None:
-            guidestars = self.params['guidestars']
-            if guidestars is None:
-                guidestars = False
+        #if guidestars is None:
+        #    guidestars = self.params['guidestars']
+        #    if guidestars is None:
+        #        guidestars = False
 
 
         # query MAST for all products for the obsid's
@@ -963,15 +968,15 @@ class query_mast:
         if self.verbose:
             print(f'productTable obtained with {len(self.productTable.t)} entries')
 
-        # remove guide stars if wanted...
-        if not guidestars:
-            ixs_products = self.productTable.getindices()
-            gs_text = '_gs-'
-            ixs_gs = self.productTable.ix_matchregex('productFilename',gs_text)
-            ixs_keep_products = AnotB(ixs_products,ixs_gs)
-            self.productTable.t=self.productTable.t.loc[ixs_keep_products].reset_index()
-            if self.verbose:
-                print('Removing %d guide star products from a total of %d products, %d left' % (len(ixs_gs),len(ixs_products),len(ixs_keep_products)))
+        # remove guide stars if wanted...THIS IS DONE IN PRODUCT_FILTER()
+        #if not guidestars:
+        #    ixs_products = self.productTable.getindices()
+        #    gs_text = '_gs-'
+        #    ixs_gs = self.productTable.ix_matchregex('productFilename',gs_text)
+        #    ixs_keep_products = AnotB(ixs_products,ixs_gs)
+        #    self.productTable.t=self.productTable.t.loc[ixs_keep_products].reset_index()
+        #    if self.verbose:
+        #        print('Removing %d guide star products from a total of %d products, %d left' % (len(ixs_gs),len(ixs_products),len(ixs_keep_products)))
 
         # Fill the suffix column with the suffix of the form _bla1.bla2, e.g. _uncal.fits
         # This will later be used to figure out
@@ -1026,7 +1031,7 @@ class query_mast:
         return self.productTable
 
 
-    def product_filter(self, productTable=None, filetypes=None, calib_levels=None, gs_omit=True):
+    def product_filter(self, productTable=None, filetypes=None, calib_levels=None):
         '''
         Filter the list of products based on the filetype (or better suffix)
         '''
@@ -1055,28 +1060,52 @@ class query_mast:
 
             print('allowed filetype list:',filetypes)
 
+
+
+
+        ####FOR TESTING
+        print(f'guidestars is {self.params["guidestars"]}')
+        gs_text = '_gs-'
+        ixs_gs = self.productTable.ix_matchregex('productFilename',gs_text)
+        print(len(ixs_gs))
+        for iddx in ixs_gs:
+            print(self.productTable.t.loc[iddx]['productFilename'])
+        print('Guide star files are present here, as expected')
+        #######FOR TESTING
+
+
+
+
+
+
         ix_products = self.productTable.getindices()
-        # remove guide stars if wanted...
-        if gs_omit:
+        if not self.params['guidestars'] and not self.params['guidestar_data_only']:
+            # If both guidestars and guidestar_data_only are False, filter out guide star products
             gs_text = '_gs-'
             ix_gs = self.productTable.ix_matchregex('productFilename',gs_text)
             if self.verbose>1:
-                print('Removing %d guide star products from a total of %d products, %d left' % (len(ix_gs),len(ix_products),len(ix_products)-len(ix_gs)))
-            ix_products = AnotB(ix_products,ix_gs)
-
+                print(f'Removing {len(ix_gs)} guide star products from a total of {len(ix_products)} products, {len(ix_products)-len(ix_gs)} left')
+            ix_products = AnotB(ix_products, ix_gs)
+        elif self.params['guidestar_data_only']:
+            # If guidestar_data_only is True, then (regardless of guidestars value) filter out the science products.
+            gs_text = '_gs-'
+            ix_gs = self.productTable.ix_matchregex('productFilename',gs_text)
+            if self.verbose>1:
+                print(f'Keeping only guide star products, {len(ix_gs)} from a total of {len(ix_products)} products. Removing {len(ix_products)-len(ix_gs)} science products.')
+            ix_products = AandB(ix_products, ix_gs)
 
         if calib_levels is not None:
             ix_calib_level = []
             for calib_level in calib_levels:
                 ixs = self.productTable.ix_equal('calib_level',calib_level,indices=ix_products)
                 if self.verbose>1:
-                    print('Keeping %d products with calib_level %d' % (len(ixs),calib_level))
+                    print(f'Keeping {len(ixs)} products with calib_level {calib_level}')
                 ix_calib_level.extend(ixs)
             if self.verbose>1:
-                print('Keeping %d out of %d products with the correct calib_levels' % (len(ix_calib_level),len(ix_products)))
+                print(f'Keeping {len(ix_calib_level)} out of {len(ix_products)} products with the correct calib_levels')
             ix_products = ix_calib_level
 
-        # Loop trough the filetypes and get all entries from ix_products list
+        # Loop through the filetypes and get all entries from ix_products list
         self.ix_selected_products = []
         if filetypes is not None:
             for filetype in filetypes:
@@ -1100,6 +1129,23 @@ class query_mast:
         self.params['filetypes'] = unique(self.productTable.t.loc[self.ix_selected_products,'filetype'])
 
         self.ix_selected_products = self.productTable.ix_sort_by_cols(self.params['sortcols_productTable'],indices=self.ix_selected_products)
+
+
+
+
+        ####FOR TESTING
+        print(f'guidestars is {self.params["guidestars"]}')
+        gs_text = '_gs-'
+        temptable = self.productTable.t.loc[self.ix_selected_products]
+        #ixs_gs = temptable.ix_matchregex('productFilename',gs_text)
+        print(len(ixs_gs))
+        print(temptable)
+        print('Are Guide star files are present here, as expected?')
+        #stop
+        #######FOR TESTING
+
+
+
 
 
         return(self.ix_selected_products)
@@ -1624,7 +1670,7 @@ class query_mast:
         # get the products:  stored in self.productTable
         # this list contains in general several entries for each observations.
         # If not otherwise specified, uses self.obsTable as starting point
-        self.product_query(Nobs_per_batch=self.params['Nobs_per_batch'])
+        self.product_query()
         if self.verbose>1:
             print(self.productTable.t)
 
