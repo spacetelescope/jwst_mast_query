@@ -40,6 +40,7 @@ PARAM_DEFAULTS = {'mastcolumns_obsTable': ['proposal_id','dataURL','obsid','obs_
                   'verbose': 0,
                   'filetypes': ['fits'],
                   'guidestars': False,
+                  'guidestar_data_only': False,
                   'lookbacktime': 1.,
                   'calib_levels': None,
                   'Nobs_per_batch': 2,
