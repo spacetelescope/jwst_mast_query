@@ -1,3 +1,18 @@
+0.0.5
+=====
+
+MAST Query
+----------
+
+Fixed a bug that was preventing guidestar data from being downloaded. Use the "guidestar" keyword to download guidestar data along with science data. Also added the "guidestar_only_data" keyword, which will remove science data and download only guidestar data. (#55)
+
+
+Tests
+-----
+
+Added some initial regression tests to be sure the behavior with and without the config file is consistent. (#53)
+
+
 0.0.4
 =====
 
