@@ -1,3 +1,11 @@
+0.0.6
+=====
+
+Packaging
+---------
+Update packaging to use pyproject.toml over setup.py for installation. The latter was relying on a dependency that contained a function that had been removed from the standard library. There is no change to the installation process. Install a local clone using "pip install ." (#62)
+
+
 0.0.5
 =====
 
