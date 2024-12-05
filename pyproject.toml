@@ -1,5 +1,69 @@
 # pyproject.toml
 [build-system]
-requires = ["setuptools<=57.4.0",
-			"wheel",
-			"setuptools_scm"]
+requires = [
+    "setuptools >= 61.2",
+    "setuptools_scm[toml]>=3.4.3",
+    "wheel",
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jwst_mast_query"
+description = "Query MAST for data products from the James Webb Space Telescope, and download them"
+authors = [
+    { name = "Armin Rest", email = "arest@stsci.edu" },
+    { name = "Bryan Hilbert", email = "bhilbert@stsci.edu" },
+    { name = "Association of Universities for Research in Astronomy", email = "help@stsci.edu" },
+]
+dynamic = [
+    "version",
+]
+readme = "README.rst"
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.21.6",
+    "scipy>=1.5.0",
+    "matplotlib>=3.2.0",
+    "astropy>=5.1.0",
+    "photutils>=1.10.0",
+    "poppy>=1.0.0",
+    "pysiaf>=0.19.1",
+    "synphot>=1.0.0",
+    "astroquery>=0.4.6",
+]
+keywords = ['astronomy']
+classifiers = [
+    'Intended Audience :: Science/Research',
+    'License :: OSI Approved :: BSD License',
+    'Operating System :: OS Independent',
+    'Programming Language :: Python',
+    'Topic :: Scientific/Engineering :: Astronomy',
+    'Topic :: Software Development :: Libraries :: Python Modules',
+]
+ 
+[project.license]
+file = "LICENSE.txt"
+
+[project.optional-dependencies]
+test = [
+    'pytest'
+]
+docs= [
+    'nbsphinx',
+    'sphinx',
+    'sphinx-automodapi',
+    'sphinx-rtd-theme',
+    'stsci-rtd-theme',
+    'extension-helpers',
+]
+
+[project.urls]
+github_project='https://github.com/spacetelescope/jwst_mast_query'
+
+[project.scripts]
+'jwst_download.py' = 'jwst_mast_query.scripts.jwst_download:main'
+
+[tool.setuptools_scm]
+version_file = "jwst_mast_query/version.py"
+
+
