@@ -17,6 +17,8 @@ from astropy.utils.data import download_file
 from jwst_mast_query.jwst_query import query_mast
 from jwst_mast_query.pdastro import makepath4file,AnotB
 from jwst_mast_query.utils.constants import PARAM_DEFAULTS
+from packaging.version import Version
+
 #from pdastro import makepath4file,AnotB
 
 
@@ -30,9 +32,9 @@ from jwst_mast_query.utils.constants import PARAM_DEFAULTS
 # https://jwst-pipeline.readthedocs.io/en/latest/jwst/data_products/file_naming.html
 # https://jira.stsci.edu/browse/JSDP-1778
 
-
-if astroquery.__version__<'0.4.2':
-    raise RuntimeError("astroquery version=%s, at least 0.4.2 required!" % astroquery.__version__)
+min_astroquery_version = Version('0.4.2')
+if Version(astroquery.__version__) < min_astroquery_version:
+    raise RuntimeError(f"astroquery version={astroquery.__version__}, at least 0.4.2 required!")
 
 def rmfile(filename,raiseError=True):
     " if file exists, remove it "
