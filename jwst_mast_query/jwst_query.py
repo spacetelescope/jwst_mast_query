@@ -16,6 +16,7 @@ import astroquery
 import argparse,os,sys,re,copy,shutil
 import yaml
 from PIL import Image
+from packaging.version import Version
 
 # pdastroclass is wrapper around pandas.
 from jwst_mast_query.pdastro import pdastroclass,unique,AnotB,AorB,AandB,split_commonpath
@@ -32,9 +33,9 @@ from jwst_mast_query.utils.constants import MAST_OBS_MODES, PARAM_DEFAULTS
 # https://jwst-pipeline.readthedocs.io/en/latest/jwst/data_products/file_naming.html
 # https://jira.stsci.edu/browse/JSDP-1778
 
-
-if astroquery.__version__<'0.4.2':
-    raise RuntimeError("astroquery version=%s, at least 0.4.2 required!" % astroquery.__version__)
+min_astroquery_version = Version('0.4.2')
+if Version(astroquery.__version__) < min_astroquery_version:
+    raise RuntimeError(f"astroquery version={astroquery.__version__}, at least 0.4.2 required!")
 
 # environment variables:
 
