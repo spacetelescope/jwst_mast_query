@@ -468,9 +468,9 @@ class query_mast:
 
         if token is None:
             if raiseErrorFlag:
-                raise RuntimeError("No token!! Cannot login! you can set the token with \$API_MAST_TOKEN, as 'token' in the config file, or with --token ")
+                raise RuntimeError("No token!! Cannot login! You can set the token with \$MAST_API_TOKEN, as 'token' in the config file, or with --token ")
             else:
-                print("Warning: no token given, could not login, only public requests possible")
+                print("Warning: No token given, could not login, only public requests possible")
                 return(1)
         else:
             self.JwstObs.login(token=token, store_token=False)
