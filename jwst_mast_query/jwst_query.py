@@ -59,11 +59,11 @@ def getlimits(lims):
     if lims is None or len(lims)==0:
         return(None)
     if len(lims)==1:
-        if re.search('\+$',lims[0]):
-            lims[0]=re.sub('\+$','',lims[0])
+        if re.search('\\+$',lims[0]):
+            lims[0]=re.sub('\\+$','',lims[0])
             return([lims[0],None])
-        elif  re.search('\-$',lims[0]):
-            lims[0]=re.sub('\-$','',lims[0])
+        elif  re.search('\\-$',lims[0]):
+            lims[0]=re.sub('\\-$','',lims[0])
             return([None,lims[0]])
         else:
             return([lims[0],lims[0]])
@@ -229,7 +229,7 @@ class query_mast:
                                                                                                        'Use -vvv to see the full list of all set parameters.'))
         parser.add_argument('--login', default=PARAM_DEFAULTS['login'], nargs=2, help='username and password for login')
         parser.add_argument('--token', type=str, default=PARAM_DEFAULTS['token'], help=('MAST API token. You can also set the token in the environment '
-                                                                                        'variable \$MAST_API_TOKEN'))
+                                                                                        'variable \\$MAST_API_TOKEN'))
         parser.add_argument('--outrootdir', default=PARAM_DEFAULTS['outrootdir'], help=('The base directory for the downloaded products. This can be the name of '
                                                                                         'an environment variable (such as JWSTDOWNLOAD_OUTDIR), or '
                                                                                         'a path. Note the preceding "$" in the case where an environment variable is '
@@ -362,7 +362,7 @@ class query_mast:
 
         def subenvvarplaceholder(paramsdict):
             """ Loop through all string parameters and substitute environment variables. environment variables have the form $XYZ """
-            envvarpattern=re.compile('\$(\w+)')
+            envvarpattern=re.compile('\\$(\\w+)')
 
             for param in paramsdict:
                 if isinstance(paramsdict[param], str):
@@ -378,7 +378,7 @@ class query_mast:
                                     raise RuntimeError("environment variable %s used in config file, but not set!" % name)
                             else:
                                 envval=os.environ[name]
-                                subpattern='\$%s' % (name)
+                                subpattern='\\$%s' % (name)
                                 paramsdict[param] = re.sub(subpattern,envval,paramsdict[param])
                 elif isinstance(paramsdict[param], dict):
                 #elif type(dict[param]) is types.DictType:
@@ -469,7 +469,7 @@ class query_mast:
 
         if token is None:
             if raiseErrorFlag:
-                raise RuntimeError("No token!! Cannot login! You can set the token with \$MAST_API_TOKEN, as 'token' in the config file, or with --token ")
+                raise RuntimeError("No token!! Cannot login! You can set the token with \\$MAST_API_TOKEN, as 'token' in the config file, or with --token ")
             else:
                 print("Warning: No token given, could not login, only public requests possible")
                 return(1)
@@ -731,7 +731,7 @@ class query_mast:
 
         # Find the obsnum # from the filename if possible.
         ixs = self.obsTable.getindices()
-        obsnumsearch = re.compile('^jw\d{5}(\d{3})\d{3}\_')
+        obsnumsearch = re.compile('^jw\\d{5}(\\d{3})\\d{3}\\_')
         self.obsTable.t['obsnum']=pd.NA
         for ix in ixs:
             m = obsnumsearch.search(self.obsTable.t.loc[ix,'obs_id'])
@@ -878,7 +878,7 @@ class query_mast:
 
         # Find the obsnum # from the filename if possible.
         ixs = self.productTable.getindices()
-        obsnumsearch = re.compile('^jw\d{5}(\d{3})\d{3}\_')
+        obsnumsearch = re.compile('^jw\\d{5}(\\d{3})\\d{3}\\_')
         self.productTable.t['obsnum']=pd.NA
         for ix in ixs:
             m = obsnumsearch.search(self.productTable.t.loc[ix,'obs_id'])
@@ -988,7 +988,7 @@ class query_mast:
 
         # Find the obsnum # from the filename if possible.
         ixs = self.productTable.getindices()
-        obsnumsearch = re.compile('^jw\d{5}(\d{3})\d{3}\_')
+        obsnumsearch = re.compile('^jw\\d{5}(\\d{3})\\d{3}\\_')
         self.productTable.t['obsnum']=pd.NA
         for ix in ixs:
             m = obsnumsearch.search(self.productTable.t.loc[ix,'obs_id'])
@@ -1039,7 +1039,7 @@ class query_mast:
                     continue
                 if re.search('^_',filetypes[i]) is None:
                     filetypes[i] = '_'+filetypes[i]
-                if re.search('\.',filetypes[i]) is None:
+                if re.search('\\.',filetypes[i]) is None:
                     filetypes[i] += '.fits'
 
             print('allowed filetype list:',filetypes)
@@ -1077,7 +1077,7 @@ class query_mast:
             for filetype in filetypes:
 
                 # make sure the '.' in the regular expression is literal, and also add '$' to the end
-                regex=re.sub('\.','\.',filetype)+'$'
+                regex=re.sub('\\.','\\.',filetype)+'$'
 
                 # get the indices for matching filetype ...
                 ix_matching_filetype = self.productTable.ix_matchregex('filetype',regex,indices=ix_products)
@@ -1430,7 +1430,7 @@ class query_mast:
         for figcol in figcols:
             suffix = figcol
             if not re.search('^_',suffix): suffix=f'_{suffix}'
-            if not re.search('\.jpg$',suffix): suffix+='.jpg'
+            if not re.search('\\.jpg$',suffix): suffix+='.jpg'
             suffixes.append(suffix)
 
         #make the thumbnails
@@ -1490,7 +1490,7 @@ class query_mast:
         for figcol in figcols:
             suffix = figcol
             if not re.search('^_',suffix): suffix=f'_{suffix}'
-            if not re.search('\.jpg$',suffix): suffix+='.jpg'
+            if not re.search('\\.jpg$',suffix): suffix+='.jpg'
             suffixes.append(suffix)
 
 
